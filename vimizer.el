@@ -1,5 +1,5 @@
 ;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
-;; Version: 0.1
+;; Version: 0.1.1
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
 
@@ -38,7 +38,7 @@
 ;;
 ;; Unlike other vimization packages for Emacs (and Vim itself), Vimizer and Usablizer don't separate insertion and command modes, because such separation results in accidentally inserting the names of commands into buffers when you try to execute the commands, and accidentally mangling buffers with random edits when you try to insert text. Instead, these packages provide modeless bindings to function keys, so the commands are always available.
 ;;
-;; Note that Vimizer will TURN OFF shift-select-mode. Shift-select is widely popular but is a waste of prime keychords. The traditional Emacs way (set mark, then use normal motion commands to select text) is the right way, and with a non-chorded key bound to push-mark-command, takes no extra keystrokes. Shift-select might also interact badly with Vimizer's cut-copy mode or line-select mode, so it's disabled as a precaution.
+;; Note that Vimizer will TURN OFF shift-select-mode, which interacts poorly with Vimizer's line-select mode. Shift-select is widely popular but is a waste of prime keychords. The traditional Emacs way (set the mark manually, then use normal motion commands to select text) is the right way, and with a non-chorded key (SunFront by default, in Vimizer's case) bound to push-mark-command, takes no extra keystrokes.
 
 
 ;;; Code:
@@ -134,7 +134,7 @@ If region is active, then operate on all lines which are at least partially incl
 
 ;; XXX: Elisp docstring syntax has no way to include other strings, so I can factor out common text?
 (defun cutline (&optional arg append)
-  "Cut the current line.
+  "Cut the current line, or ARG lines.
 If region is active, then operate on all lines which are at least partially included in region."
   (interactive "p")
   (cut-copy-line #'not-presumptuous-cut-region t (or arg 1) append))
@@ -145,7 +145,7 @@ If region is active, then operate on all lines which are at least partially incl
   (cutline arg t))
 
 (defun copyline (&optional arg append)
-  "Copy the current line.
+  "Copy the current line, or ARG lines.
 If region is active, then operate on all lines which are at least partially included in region."
   (interactive "p")
   (cut-copy-line #'not-presumptuous-copy-region nil (or arg 1) append))
@@ -168,7 +168,7 @@ This function replaces the weird and unnecessary arg handling of Emacs's standar
     (setq arg (- arg 1))))
 
 (defun paste-over (&optional arg)
-  "Paste over current line."
+  "Paste over current line. Optionally repeat ARG times."
   (interactive "p")
   (unless arg (setq arg 1))
   (when (> arg 0)
@@ -184,7 +184,7 @@ This function replaces the weird and unnecessary arg handling of Emacs's standar
 
 ;; I don't need paste-under after all (I was brainwashed by Vim); paste-over suffices
 (defun paste-under (&optional arg)
-  "Paste under current line."
+  "Paste under current line. Optionally repeat ARG times."
   (interactive "p")
   (unless arg (setq arg 1))
   (when (> arg 0)
@@ -250,8 +250,9 @@ This is the equivalent of `mouse-yank-primary', but suitable for keyboard bindin
 (defvar cctm-frame-of-anchor nil)
 
 (defun modal-cut (&optional arg append)
-  "Cut using Vim-style transient mode.
-Do standard cut if region is active; otherwise, cut the range moved over by the next motion command."
+  "Cut using Vim-style motion-composed transient mode.
+Do standard cut if region is active; otherwise, cut the range moved over by the next command.
+Optional ARG is passed to the next command."
   (interactive "P")
   (if mark-active
       (not-presumptuous-cut-region (region-beginning) (region-end) t append t)
@@ -262,8 +263,9 @@ Do standard cut if region is active; otherwise, cut the range moved over by the 
     (cctm-enter-common arg append)))
 
 (defun modal-copy (&optional arg append)
-  "Copy using Vim-style transient mode.
-Do standard copy if region is active; otherwise, copy the range moved over by the next motion command."
+  "Copy using Vim-style motion-composed transient mode.
+Do standard copy if region is active; otherwise, copy the range moved over by the next command.
+Optional ARG is passed to the next command."
   (interactive "P")
   (if mark-active
       (not-presumptuous-copy-region (region-beginning) (region-end) t append t)
@@ -274,10 +276,12 @@ Do standard copy if region is active; otherwise, copy the range moved over by th
     (cctm-enter-common arg append)))
 
 (defun modal-cut-append (arg)
+  "Do `modal-cut', but append the cut text to the element at the head of the clip ring instead of pushing a new element."
   (interactive "P")
   (modal-cut arg t))
 
 (defun modal-copy-append (arg)
+  "Do `modal-copy', but append the copied text to the element at the head of the clip ring instead of pushing a new element."
   (interactive "P")
   (modal-copy arg t))
 
@@ -297,7 +301,7 @@ Do standard copy if region is active; otherwise, copy the range moved over by th
   (assert (or cctm-cut-mode cctm-copy-mode))
   (unless (or (memq this-command cctm-activators) ; Motion is next command, not this one
 	      prefix-arg) ; This command was uarg, so wait for next non-uarg command before acting, in order to allow the uarg to apply to the motion command
-    (condition-case e
+    (unwind-protect
 	(unless (or (= cctm-anchor (point)) ; If command was not motion, don't do cut or copy
 		    (memq this-command cctm-aborters)
 		    (> cctm-anchor (point-max))) ; Don't screw up if something unexpectedly changed
@@ -311,10 +315,7 @@ Do standard copy if region is active; otherwise, copy the range moved over by th
 		    (not-presumptuous-cut-region start end nil cctm-append)
 		  ;; cctm-copy-mode here assured by the «assert» above
 		  (not-presumptuous-copy-region start end nil cctm-append)))))
-      ('error
-       (cctm-exit)
-       (signal (car e) (cdr e))))
-    (cctm-exit))) ; Yes, abort even when just moving focus to another window. Leaving cut or copy transient mode enabled would just lead to user accidents.
+      (cctm-exit)))) ; Yes, abort even when just moving focus to another window. Leaving cut or copy transient mode enabled would just lead to user accidents.
 
 (defun cctm-exit ()
   (save-selected-window ; In case top-level command selected a different window
@@ -390,9 +391,9 @@ Select the current logical line, and select more logical lines when point is mov
       (setq arg (- arg 1)))
     (forward-line (- arg))))
 
+;; Set the start and end anchors for line-select mode.
+;; If the mark is active and RESET is nil, extend the current region to include whole logical lines rather than resetting the region to include just the current logical line.
 (defun lsmm-set-anchors (reset)
-  "Set the start and end anchors for line-select mode.
-If the mark is active and RESET is nil, extend the current region to include whole logical lines rather than resetting the region to include just the current logical line."
   (if (and mark-active (not reset))
       (let* ((old-mark (mark))
 	     (old-point (point))
@@ -413,8 +414,8 @@ If the mark is active and RESET is nil, extend the current region to include who
     (setq lsmm-anchor-line-beginning (point))
     (setq lsmm-point-is-past-anchor nil)))
 
+;; Ensure selection of whole lines when in line-select mode
 (defun lsmm-dominate-point-mark ()
-  "Ensure selection of whole lines when in line-select mode."
   (assert line-select-minor-mode)
   (if (<= (point) lsmm-anchor-line-beginning)
       (progn
@@ -448,9 +449,14 @@ If the mark is active and RESET is nil, extend the current region to include who
 ;;; Init
 
 (defun vimizer-init ()
-  "Hijack the user's settings and keybindings."
+  "Hijack the user's settings and keybindings.
 
-  ;; Ensure compatibility with Vimizer's cut-copy transient mode.
+Change Emacs settings to ensure compatibility with Vimizer's cut-copy transient mode and line-select mode.
+Add hooks to set bar cursor when mark is active, and block cursor when mark is inactive.
+Bind Cut, Copy, Paste, and SunFront keys.
+
+Note: this function TURNS OFF `shift-select-mode'."
+
   (unless (eq cursor-type t)
     (user-error "Aborting vimizer-init to avoid overriding your weirdo config"))
   (unless transient-mark-mode
@@ -489,6 +495,8 @@ If the mark is active and RESET is nil, extend the current region to include who
 
      ;; Miscellaneous
      ([SunFront] (lambda () ; X calls my setmark key ⌜SunFront⌝
+		   ;; "Mark set" message is superfluous, since Vimizer sets cursor type
+		   "Push and activate mark silently."
 		   (interactive) (push-mark-command nil t)))
      ([S-SunFront] line-select-minor-mode-enable)
      ([M-SunFront] rectangle-mark-mode))))
