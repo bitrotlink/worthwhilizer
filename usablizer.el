@@ -1,4 +1,4 @@
-;;; usablizer.el --- Makes Emacs usable -*- lexical-binding: t; -*-
+;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
 ;; Version: 0.1
 ;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.1"))
 ;; Keywords: convenience
@@ -17,8 +17,8 @@
 
 (require 'misc)
 (require 'undo-tree)
-(eval-when-compile (require 'vimizer)) ; For the «silently» macro
-
+(eval-when-compile (require 'cl))
+(eval-and-compile (require 'vimizer)) ; For the «silently» macro, and global-set-key-list
 
 (defalias 'isearch-truncate-or-abort 'isearch-abort) ; See isearch-really-abort
 
@@ -206,7 +206,7 @@ If `mark' is nil but there's at least one non-nil marker on the ring, move it to
 If ARG is 0, then don't do anything."
   (interactive "p")
   (unless (= arg 0)
-    (if (called-interactively-p)
+    (if (called-interactively-p 'any)
 	(setq this-command 'beginning-of-defun)) ; So it pushes the mark
     (beginning-of-defun arg)))
 
@@ -240,7 +240,7 @@ Leave point at the end of the defun where it ought to be, rather than at the beg
 (defun forward-to-defun (&optional arg)
   "Move to the beginning of the next defun, analogous to `forward-to-sexp'."
   (interactive "p")
-  (if (called-interactively-p) (setq this-command 'beginning-of-defun)) ; So it pushes the mark
+  (if (called-interactively-p 'any) (setq this-command 'beginning-of-defun)) ; So it pushes the mark
   ;; XXX: Would need to do same dance as for forward-to-paragraph and forward-to-sexp, which would mean certainly now I need to put that dance into a macro, instead of repeating the code, but fortunately beginning-of-defun moves to next start of defun rather than to next end of defun.
   (not-weird-beginning-of-defun (- arg)))
 
@@ -319,13 +319,16 @@ With optional LEVEL, go forward to end of nth containing list (default 1st)."
 
 (defun silent-beginning-of-buffer (arg)
   (interactive "P")
-  (silently (beginning-of-buffer arg)))
+  (silently (with-no-warnings ; Ugh
+	      (beginning-of-buffer arg))))
 
 (defun silent-end-of-buffer (arg)
   (interactive "P")
-  (silently (end-of-buffer arg)))
+  (silently (with-no-warnings
+	      (end-of-buffer arg))))
 
-;; Derived from Emacs's zap-to-char TODO: inclusive and exclusive find implemented differently, for no good reason. Choose the better one, and do both that way.
+;; Derived from Emacs's zap-to-char
+;; TODO: inclusive and exclusive find are implemented differently, for no good reason. Choose the better one, and do both that way.
 (defun find-char-inclusive (arg char)
   "Find ARGth occurrence of CHAR and leave point after it, or at it if backward search.
 Case is ignored if `case-fold-search' is non-nil in the current buffer.
@@ -573,6 +576,18 @@ Bind a key to this function instead of directly to kill-buffer so that ido-mode 
   (interactive)
   (kill-buffer))
 
+;; Copied from http://stackoverflow.com/questions/1212426/how-do-i-close-an-automatically-opened-window-in-emacs
+(defun other-window-kill-buffer ()
+  "Kill the buffer in the other window"
+  (interactive)
+  ;; Window selection is used because point goes to a different window
+  ;; if more than 2 windows are present
+  (let ((win-curr (selected-window))
+        (win-other (next-window)))
+    (select-window win-other)
+    (kill-this-buffer)
+    (select-window win-curr)))
+
 (defun undo-tree-mode-not-enabled ()
   (interactive)
   (user-error "undo-tree-mode not enabled"))
@@ -630,7 +645,7 @@ If N is negative, don't delete newlines."
         (n (abs n)))
     (skip-chars-backward skip-characters)
     (constrain-to-field nil orig-pos)
-    (dotimes (i n)
+    (dotimes (_i n) ; Marking «i» so the byte compiler doesn't whine
       (if (= (following-char) ?\s)
 	  (forward-char 1)
 	(insert ?\s)))
@@ -648,7 +663,7 @@ If N is negative, don't delete newlines."
     (if (and (eq this-command last-command) ; Could be false due to calling with prefix arg, then calling without
 	     (looking-back "[\n ]" (1- (point))))
 	(progn
-	  (delete-backward-char 1)
+	  (delete-char -1)
 	  (case (get this-command 'state)
 	    ('space (progn (put this-command 'state 'eol)
 			   (insert ?\n)))
@@ -821,11 +836,7 @@ If N is negative, don't delete newlines."
      ([S-f19] point-to-register)
      ([M-f19] list-registers)
      ;; TODO change scrolling for undo-tree visualizer to use scroll-lock-mode, or at least stop scrolling conservatively. Just setting scroll-conservatively with let binding doesn't work; global value has to be set. Maybe using make-local-variable?
-     (global-set-key [Scroll_Lock] 'scroll-lock-mode))) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
-
-
-
-Move menu key to asterisk, and get rid of that fn key and its functions that I never use, or just move to right little finger.
+     ([Scroll_Lock] scroll-lock-mode))) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
 
   (mapc
    (lambda (x) (define-key universal-argument-map (car x) (cadr x)))
@@ -836,9 +847,9 @@ Move menu key to asterisk, and get rid of that fn key and its functions that I n
      ([f3] universal-argument-more-3)
      ([S-f3] universal-argument-more-3)))
 
-(define-key undo-tree-map [undo] 'undo-tree-undo)
-(define-key undo-tree-map [S-undo] 'undo-tree-redo)
-(define-key undo-tree-map [M-undo] 'undo-tree-visualize)
+  (define-key undo-tree-map [undo] 'undo-tree-undo)
+  (define-key undo-tree-map [S-undo] 'undo-tree-redo)
+  (define-key undo-tree-map [M-undo] 'undo-tree-visualize)
 
 
 ;;; Emacs: the customizable text editor, in roughly the same way that a brick wall is customizable. If you beat your head against it hard enough, you can actually shove it into a less obstructive form.
@@ -853,15 +864,15 @@ Move menu key to asterisk, and get rid of that fn key and its functions that I n
   (define-key isearch-mode-map [remap keyboard-quit] 'isearch-really-abort)
   (define-key isearch-mode-map [remap partial-escape] 'isearch-truncate-or-abort)
   (define-key undo-tree-visualizer-mode-map [remap keyboard-quit] 'undo-tree-visualizer-quit)
-;; ...and some more (these ones derived from delsel.el)
-(mapc (lambda (x)
-	(define-key x [remap keyboard-quit] 'minibuffer-keyboard-quit))
-      (list
-       minibuffer-local-map
-       minibuffer-local-ns-map
-       minibuffer-local-completion-map
-       minibuffer-local-must-match-map
-       minibuffer-local-isearch-map))
+  ;; ...and some more (these ones derived from delsel.el)
+  (mapc (lambda (x)
+	  (define-key x [remap keyboard-quit] 'minibuffer-keyboard-quit))
+	(list
+	 minibuffer-local-map
+	 minibuffer-local-ns-map
+	 minibuffer-local-completion-map
+	 minibuffer-local-must-match-map
+	 minibuffer-local-isearch-map))
 
   ;; FIXME: I want to send escape in term mode rather than interpret it in Emacs.
   ;; But the following doesn't work, and I don't know why:

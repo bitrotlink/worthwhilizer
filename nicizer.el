@@ -1,4 +1,4 @@
-;;; nicizer.el --- Makes Emacs nice -*- lexical-binding: t; -*-
+;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
 ;; Version: 0.1
 ;; Package-Requires: ((paredit FIXME) (usablizer "0.1"))
 

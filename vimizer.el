@@ -1,4 +1,4 @@
-;;; vimizer.el --- Makes Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
+;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
 ;; Version: 0.1
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
@@ -36,16 +36,17 @@
 ;;
 ;; Additional Vim-inspired features for Emacs are in Usablizer, a companion package for Vimizer.
 ;;
-;; Unlike other vimization packages for Emacs (and Vim itself), Vimizer and Usablizer don't separate insertion and command modes, because such separation results in accidentally inserting the names of commands into buffers when you try to execute the commands, and accidentally mangling buffers with random edits when you try to insert text.
+;; Unlike other vimization packages for Emacs (and Vim itself), Vimizer and Usablizer don't separate insertion and command modes, because such separation results in accidentally inserting the names of commands into buffers when you try to execute the commands, and accidentally mangling buffers with random edits when you try to insert text. Instead, these packages provide modeless bindings to function keys, so the commands are always available.
 ;;
-;; Note that Vimizer will TURN OFF shift-select-mode. Shift-select is widely popular but is a waste of prime keychords. The traditional Emacs way (set mark, then use normal motion commands to select text) is the right way, and with a nonchorded key bound to push-mark-command, takes no extra keystrokes. Shift-select might also interact badly with Vimizer's cut-copy mode or line-select mode; I haven't tested.
+;; Note that Vimizer will TURN OFF shift-select-mode. Shift-select is widely popular but is a waste of prime keychords. The traditional Emacs way (set mark, then use normal motion commands to select text) is the right way, and with a non-chorded key bound to push-mark-command, takes no extra keystrokes. Shift-select might also interact badly with Vimizer's cut-copy mode or line-select mode, so it's disabled as a precaution.
 
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
+(eval-when-compile (require 'cl))
 
-(defvaralias 'clip-ring 'kill-ring) ; The ring of clippings includes not only ‟killed” (i.e. cut) things, but also copied things
+(eval-and-compile ; Silence the byte compiler warning
+  (defvaralias 'clip-ring 'kill-ring)) ; The ring of clippings includes not only ‟killed” (i.e. cut) things, but also copied things
 (defalias 'paste-rotate-reverse 'yank-pop) ; ‟pop” implies consumption, which yank-pop doesn't actually do
 
 
@@ -58,16 +59,9 @@
 	     `(cl-letf (((symbol-function ',',victim) (lambda (&rest _dummy) ())))
 		,@body)))
 
-;; TODO: instead just have a single macro named ⌜without⌝, that takes both victim and body.
 (define-nullifier silently message "Do BODY without messaging anything.")
 (define-nullifier not-pushily push-mark "Do BODY without pushing the mark.")
 (define-nullifier not-activatingly activate-mark "Do BODY without activating the mark.")
-
-;; DELETEME: The above produces e.g.:
-;; (defmacro silently (&rest body)
-;;   "Do BODY without messaging anything."
-;;   `(cl-letf (((symbol-function 'message) (lambda (&rest _dummy) ())))
-;;      ,@body))
 
 (defun clip-ring-maybe-append-eol ()
   "If no EOL char at end of element at head of clip ring, append one."
@@ -349,11 +343,11 @@ Do standard copy if region is active; otherwise, copy the range moved over by th
 
 (defvar line-select-minor-mode-map (make-keymap))
 (mapc (lambda (x) (define-key line-select-minor-mode-map (car x) (cadr x)))
-      '(([remap previous-line] 'backward-line)
-	([remap previous-logical-line] 'backward-line)
-	([remap next-line] 'forward-line)
-	([remap next-logical-line] 'forward-line)
-	([remap exchange-point-and-mark] 'lsmm-exchange-point-mark)))
+      '(([remap previous-line] backward-line)
+	([remap previous-logical-line] backward-line)
+	([remap next-line] forward-line)
+	([remap next-logical-line] forward-line)
+	([remap exchange-point-and-mark] lsmm-exchange-point-mark)))
 
 (define-minor-mode line-select-minor-mode
   "Select logical lines.
@@ -455,6 +449,26 @@ If the mark is active and RESET is nil, extend the current region to include who
 
 (defun vimizer-init ()
   "Hijack the user's settings and keybindings."
+
+  ;; Ensure compatibility with Vimizer's cut-copy transient mode.
+  (unless (eq cursor-type t)
+    (user-error "Aborting vimizer-init to avoid overriding your weirdo config"))
+  (unless transient-mark-mode
+    (user-error "Aborting vimizer-init to avoid overriding your luddite config"))
+  (unless (or (and (= emacs-major-version 24) (>= emacs-minor-version 4))
+	      (>= emacs-major-version 25))
+    (user-error "This version of Vimizer only works with Emacs 24.4 or later")) ; At least because of the change to kill-region in 24.4, and probably other things I don't remember
+
+  (blink-cursor-mode 0) ; Vimizer's cut-copy transient mode indicates activation by blinking the cursor
+  (delete-selection-mode)
+  (setq use-empty-active-region t)
+  (setq shift-select-mode nil)
+
+  ;; Vimizer-specific features
+  (add-hook 'deactivate-mark-hook 'line-select-minor-mode-disable) ; Whatever deactivates the mark (e.g. cut or copy, or keyboard-quit) also must deactivate line-select mode.
+  (add-hook 'deactivate-mark-hook 'vimizer-deactivate-mark)
+  (add-hook 'activate-mark-hook 'vimizer-activate-mark)
+
   (global-set-key-list
    '(
 
@@ -477,25 +491,7 @@ If the mark is active and RESET is nil, extend the current region to include who
      ([SunFront] (lambda () ; X calls my setmark key ⌜SunFront⌝
 		   (interactive) (push-mark-command nil t)))
      ([S-SunFront] line-select-minor-mode-enable)
-     ([M-SunFront] rectangle-mark-mode)))
-
-  ;; Ensure compatibility with Vimizer's cut-copy transient mode.
-  (unless (eq cursor-type t)
-    (user-error "Aborting vimizer-init to avoid overriding your weirdo config"))
-  (unless transient-mark-mode
-    (user-error "Aborting vimizer-init to avoid overriding your luddite config"))
-  (unless (or (and (= emacs-major-version 24) (>= emacs-minor-version 4))
-	      (>= emacs-major-version 25))
-    (user-error "This version of Vimizer only works with Emacs 24.4 or later")) ; At least because of the change to kill-region in 24.4, and probably other things I don't remember
-  (blink-cursor-mode 0) ; Vimizer's cut-copy transient mode indicates activation by blinking the cursor
-  (delete-selection-mode)
-  (setq use-empty-active-region t)
-  (setq shift-select-mode nil)
-
-  ;; Vimizer-specific features
-  (add-hook 'deactivate-mark-hook 'line-select-minor-mode-disable) ; Whatever deactivates the mark (e.g. cut or copy, or keyboard-quit) also must deactivate line-select mode.
-  (add-hook 'deactivate-mark-hook 'vimizer-deactivate-mark)
-  (add-hook 'activate-mark-hook 'vimizer-activate-mark))
+     ([M-SunFront] rectangle-mark-mode))))
 
 
 (provide 'vimizer)
