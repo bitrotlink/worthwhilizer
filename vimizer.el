@@ -1,5 +1,5 @@
 ;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
-;; Version: 0.1.3
+;; Version: 0.1.4
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
 
@@ -13,7 +13,7 @@
 
 ;;; Commentary:
 ;;
-;; Vimizer provides:
+;; Features:
 ;;
 ;; 0. Vim-style cut and copy transient modes.
 ;; Press Cut or Copy to enter cut or copy transient mode (if the region isn't active); then the next command, if it's a motion command, will result in the text moved over by that command being cut or copied. You can provide a prefix arg before or after entering the transient mode, which will cut or copy the text moved over by repeating the motion command the specified number of times, like in Vim.
@@ -219,7 +219,9 @@ This is the equivalent of `mouse-yank-primary', but suitable for keyboard bindin
 
 ;;; Vim-style cut-copy transient mode
 
-(defconst cctm-activators '(modal-cut modal-copy modal-cut-append modal-copy-append))
+(defconst cctm-activators
+  '(modal-cut modal-copy modal-cut-append modal-copy-append)
+  "List of commands that activate cut-copy transient mode.")
 
 (defconst cctm-aborters
   '(self-insert-command yank not-weird-paste paste-over paste-under undo undo-tree-undo undo-tree-redo eval-region-or-last-sexp)
@@ -295,7 +297,7 @@ Optional ARG is passed to the next command."
 	cctm-buffer-of-anchor (current-buffer)
 	cctm-window-of-anchor (selected-window)
 	cctm-frame-of-anchor (selected-frame))
-  (blink-cursor-mode)
+  (blink-cursor-mode) ; Visually indicate that mode is active
   (add-hook 'post-command-hook 'cctm-maybe-cut-copy)) ; Intentionally not buffer-local
 
 ;; If in cut-copy transient mode, do cut or copy with next motion command

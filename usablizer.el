@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.1
+;; Version: 0.1.1
 ;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.1"))
 ;; Keywords: convenience
 
@@ -12,6 +12,66 @@
 
 
 ;;; Commentary:
+;;
+;; Features:
+;;
+;; All of the following features ought to be in standard Emacs, to make it usable by default. Until then, Usablizer is available as a separate package.
+;;
+;; 0. Fixes for Emacs's weirdly-behaving movement commands.
+;; Emacs has word-based movement commands that work exactly like they're supposed to:
+;; backward-word lands on the first preceding start of a word
+;; forward-word lands following the next end of a word
+;; forward-to-word lands on the next start of a word
+;; However, the standard s-exp-, defun-, and paragraph-based movement commands land on the wrong position, give inscrutable error messages, or are just plain missing. Usablizer replaces them with fixed versions. See the new commands' docstrings for details.
+;;
+;; 1. A replacement for Emacs's point-losing pop-to-mark-command.
+;; In Emacs, pop-to-mark-command loses the current point. That loss is annoying.
+;; Usablizer fixes that with the command reverse-rotate-mark-ring-and-point, which replaces pop-to-mark-command.
+;;
+;; Here's how it works. Emacs has a point, a mark, and a separate mark ring (list with a head and tail).
+;; push-mark does this:
+;; new head ← mark
+;; mark ← point
+;; if length of list > max, then chop off tail
+;;
+;; pop-to-mark-command does this:
+;; point ← mark; loses point
+;; new tail ← mark
+;; mark ← head
+;; chop off head
+;;
+;; reverse-rotate-mark-ring-and-point does this instead:
+;; new tail ← point
+;; point ← mark; doesn't lose point, since it was saved in the previous step
+;; mark ← head
+;; chop off head
+;;
+;; rotate-mark-ring-and-point does this, so you don't have to cycle through the whole ring to get back where you were:
+;; new head ← mark
+;; mark ← point
+;; point ← tail
+;; chop off tail
+;;
+;; 2. Less-accident-prone interactive evaluation.
+;; Suppose you accidentally use eval-last-sexp instead of eval-region after setting the region around a block of code, so you think you evaluated it all but actually didn't. Or you type just one expression and intend to evaluate it, but accidentally use eval-region (to which you have a key bound because you use it often), which evaluates a bunch of stuff you didn't want.
+;;
+;; eval-region-or-last-sexp solves those problems. It simply evals the region if it's active, and evals the last sexp otherwise. If you use transient mark mode, it's unlikely that you want eval-region when you don't have an active region, and it's unlikely that you want eval-last-sexp when you do have an active region, so combining the two into one command reduces mistakes.
+;;
+;; 3. Miscellaneous convenience commands.
+;; Vim's «o» and «O». 'nuff said.
+;; rename-file-and-buffer, with accident avoidance.
+;; set-line-wrap, a replacement for Emacs's toggle-word-wrap, whose name is a lie (though at least the lie is documented) if truncate-lines or truncate-partial-width-windows is non-nil.
+;; Many others.
+;;
+;; 4. Keybindings (not enabled by default).
+;; Optimal keybindings for all the features above. You'll hate these, because your keyboard sucks.
+;; All normal modern software uses the «escape» key to escape the current context (i.e. cancel), but Emacs by default uses it as a sticky modifier key for chorded hotkeys. Usablizer provides the correct binding for «escape».
+;; To enable all the keybindings, use:
+;; (usablizer-bind-keys)
+;;
+;; 5. Register maintenance.
+;; Emacs lets your registers become stale. Usablizer provides register-swap-back, which solves this problem.
+
 
 ;;; Code:
 
@@ -318,11 +378,13 @@ With optional LEVEL, go forward to end of nth containing list (default 1st)."
 				   (format "Not in %d lists" level) "Not in list"))))))
 
 (defun silent-beginning-of-buffer (arg)
+  "Do `beginning-of-buffer' without its message noise."
   (interactive "P")
   (silently (with-no-warnings ; Ugh
 	      (beginning-of-buffer arg))))
 
 (defun silent-end-of-buffer (arg)
+  "Do `end-of-buffer' without its message noise."
   (interactive "P")
   (silently (with-no-warnings
 	      (end-of-buffer arg))))
@@ -344,6 +406,7 @@ Goes backward if ARG is negative; error if CHAR not found."
     (if (and (not mark-active) (not (eq (point) start))) (push-mark start))))
 
 (defun backward-find-char-inclusive (arg)
+  "Do `find-char-inclusive' backward."
   (interactive "P")
   (setq current-prefix-arg (- (prefix-numeric-value arg)))
   (call-interactively #'find-char-inclusive))
@@ -364,6 +427,7 @@ Ignores CHAR at point."
     (if (and (not mark-active) (not (eq (point) start))) (push-mark start))))
 
 (defun backward-find-char-exclusive (arg)
+  "Do `find-char-exclusive' backward."
   (interactive "P")
   (setq current-prefix-arg (- (prefix-numeric-value arg)))
   (call-interactively #'find-char-exclusive))
@@ -539,6 +603,7 @@ This function ought to be called ⌜isearch-abort⌝, but that name is already t
 
 ;; Normally, partial escape is same as full escape, but making it a separate function enables proper remapping of keys, e.g. for isearch mode
 (defun partial-escape ()
+  "Do `keyboard-quit'."
   (interactive)
   (keyboard-quit))
 
@@ -559,6 +624,7 @@ This command sets the values of `truncate-lines' and `word-wrap', which are sepa
   (force-mode-line-update))
 
 (defun toggle-region-activation ()
+  "Self explanatory."
   (interactive)
   (if (mark t)
       (if mark-active (deactivate-mark) (activate-mark))
@@ -681,6 +747,11 @@ If N is negative, don't delete newlines."
     ;; If neither condition is true, then this command was probably an accident.
     (user-error "Region not active, and previous command was not a yank")))
 
+(defun check-parens-and-report ()
+"Do `check-parens', then report if no errors are found, to avoid causing the user to wonder whether anything actually happened if no errors are found."
+  (interactive)
+  (unless (check-parens) (message "check-parens reported no errors")))
+
 
 ;;; Special case prefix args 2 and 3 since they're so common, and deserve their own keys without having to press the uarg key before them to initiate numeral entry. 4 is default for uarg, so it already doesn't require pressing an extra key. 5 and higher are infrequent enough that no special casing is needed; requiring uarg command prefix for them is ok.
 
@@ -714,7 +785,7 @@ If N is negative, don't delete newlines."
 
 ;;; Init
 
-;; This is an essential usability issue, so I'm putting it at top level, not in a function that must be run.
+;; This is an essential usability issue, so I'm putting it at top level, not in a function
 (add-hook 'find-file-hook 'register-swap-back)
 
 (defun usablizer-bind-keys ()
@@ -737,8 +808,8 @@ If N is negative, don't delete newlines."
      ([S-prior] scroll-down-line)
      ([S-next] scroll-up-line)
      ([f24] forward-to-word)
-     ([C-f15] reverse-rotate-mark-ring-and-point) ; Using C-15 for revmark key since I'm out of available scancodes
-     ([C-S-f15] rotate-mark-ring-and-point)
+     ([f15] reverse-rotate-mark-ring-and-point)
+     ([S-f15] rotate-mark-ring-and-point)
      ([C-S-left] back-sexp) ; Using C-left and C-right for bw_word and end_wrd keys, so I get S-bw_word and S-end_wrd for back-sexp and end-sexp
      ([C-S-right] end-sexp)
      ([S-f24] forward-to-sexp)
@@ -762,6 +833,7 @@ If N is negative, don't delete newlines."
      ([S-f21] backward-find-char-inclusive)
      ([M-f21] find-char-inclusive)
      ([M-S-f21] backward-find-char-exclusive)
+     ([f17] goto-line) ; TODO: what do I really want on f17? goto-line is too rare to waste a key on it.
      ([M-S-up] move-to-window-line-top-bottom)
      ([S-right] recenter-top-bottom)
 
@@ -810,7 +882,7 @@ If N is negative, don't delete newlines."
      ([s-S-undo] winner-redo)
 
      ;; Miscellaneous
-     ([M-S-f15] count-words)
+     ([C-M-S-f15] count-words)
      ([M-S-right] set-line-wrap)
      ([f18] universal-argument)
      ([S-f18] universal-argument)
@@ -838,7 +910,10 @@ If N is negative, don't delete newlines."
      ([S-f19] point-to-register)
      ([M-f19] list-registers)
      ;; TODO change scrolling for undo-tree visualizer to use scroll-lock-mode, or at least stop scrolling conservatively. Just setting scroll-conservatively with let binding doesn't work; global value has to be set. Maybe using make-local-variable?
-     ([Scroll_Lock] scroll-lock-mode))) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
+     ([Scroll_Lock] scroll-lock-mode) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
+     ([S-f17] check-parens-and-report)
+     ([M-f17] show-paren-mode)
+     ([M-S-f17] mark-whole-buffer)))
 
   (mapc
    (lambda (x) (define-key universal-argument-map (car x) (cadr x)))
