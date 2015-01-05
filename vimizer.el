@@ -21,11 +21,10 @@
 ;; If the region is active, then Cut or Copy will simply cut or copy the region instead of entering the transient mode.
 ;;
 ;; 1. Vim-style line-based cutting, copying, pasting, and selection, and repeatable pasting.
-;; Press S-Cut or S-Copy to cut or copy the current line, regardless of where the cursor currently is on the line. Use a prefix arg to cut or copy the specified number of lines.
+;; Press S-Cut or S-Copy to cut or copy the current logical line, regardless of where the cursor currently is on the line. Use a prefix arg to cut or copy the specified number of lines.
 ;; Press Paste to paste text from the head of the clip ring. Use a prefix arg to paste the specified number of copies of that text.
-;; Press S-Paste to paste text from the head of the clip ring to a new line over the current line, regardless of where the cursor currently is on the line, and regardless of whether the pasted text was originally cut or copied as a full line. Because of this, if you press S-Cut followed by S-Paste, the text is cut and then pasted back in the same place, effectively undoing the cut. If you press S-Copy followed by S-Paste, the current line is duplicated.
+;; Press S-Paste to paste text from the head of the clip ring to a new line over the current logical line, regardless of where the cursor currently is on the line, and regardless of whether the pasted text was originally cut or copied as a full line. Because of this, if you press S-Cut followed by S-Paste, the text is cut and then pasted back in the same place, effectively undoing the cut. If you press S-Copy followed by S-Paste, the current logical line is duplicated.
 ;; Press S-SunFront to enter line-select mode. In this mode, complete logical lines are selected and highlighted, regardless of which commands you use to move the cursor. You can then cut or copy the selected text or do anything else that uses an active region. To cancel the mode, press whatever key or chord you have bound to keyboard-quit (C-g by default in Emacs).
-;;
 ;; Press M-Cut, M-Copy, M-S-Cut, or M-S-Copy to do the same as without M, but append the cut or copied text to the end of the text at the head of the clip ring rather than pushing the cut or copied text to a new element on the clip ring.
 ;; Press M-Paste to reverse rotate through the clip ring and replace the last pasted text (this is Emacs's standard yank-pop). Press M-S-Paste to forward rotate. Press s-XF86Paste to paste the primary selection (OS-dependent).
 ;; Press SunFront to enter standard text-select mode (this is Emacs's standard push-mark-command).
@@ -93,7 +92,7 @@ REGION is passed as the new argument to kill-region as of Emacs 24.4, the purpos
   (setq this-command 'bugger-off))
 
 (defun cut-copy-line (cut-copy-func is-cut arg append)
-  "Cut or copy the current line.
+  "Cut or copy the current logical line.
 If region is active, then operate on all lines which are at least partially included in region."
   (cctm-exit) ; Avoid screwing up if cutline is called while in cut or copy transient mode
   (save-excursion
@@ -170,7 +169,7 @@ This function replaces the weird and unnecessary arg handling of Emacs's standar
     (setq arg (- arg 1))))
 
 (defun paste-over (&optional arg)
-  "Paste over current line. Optionally repeat ARG times."
+  "Paste over current logical line. Optionally repeat ARG times."
   (interactive "p")
   (unless arg (setq arg 1))
   (when (> arg 0)
@@ -186,7 +185,7 @@ This function replaces the weird and unnecessary arg handling of Emacs's standar
 
 ;; I don't need paste-under after all (I was brainwashed by Vim); paste-over suffices
 (defun paste-under (&optional arg)
-  "Paste under current line. Optionally repeat ARG times."
+  "Paste under current logical line. Optionally repeat ARG times."
   (interactive "p")
   (unless arg (setq arg 1))
   (when (> arg 0)
