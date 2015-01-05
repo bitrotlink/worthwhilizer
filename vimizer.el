@@ -1,5 +1,5 @@
 ;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
-;; Version: 0.1.1
+;; Version: 0.1.2
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
 
@@ -38,7 +38,7 @@
 ;;
 ;; Unlike other vimization packages for Emacs (and Vim itself), Vimizer and Usablizer don't separate insertion and command modes, because such separation results in accidentally inserting the names of commands into buffers when you try to execute the commands, and accidentally mangling buffers with random edits when you try to insert text. Instead, these packages provide modeless bindings to function keys, so the commands are always available.
 ;;
-;; Note that Vimizer will TURN OFF shift-select-mode, which interacts poorly with Vimizer's line-select mode. Shift-select is widely popular but is a waste of prime keychords. The traditional Emacs way (set the mark manually, then use normal motion commands to select text) is the right way, and with a non-chorded key (SunFront by default, in Vimizer's case) bound to push-mark-command, takes no extra keystrokes.
+;; Note that Vimizer will globally TURN OFF shift-select-mode because it interacts poorly with Vimizer's line-select mode and can't be cleanly separated due to bug #19513 in Emacs 24.4. But shift-select is a waste of prime keychords anyway, even though it's widely popular. The traditional Emacs way (set the mark manually, then use normal motion commands to select text) is the right way, and with a non-chorded key (SunFront by default, in Vimizer's case) bound to push-mark-command, takes no extra keystrokes.
 
 
 ;;; Code:
@@ -46,13 +46,13 @@
 (eval-when-compile (require 'cl))
 
 (eval-and-compile ; Silence the byte compiler warning
-  (defvaralias 'clip-ring 'kill-ring)) ; The ring of clippings includes not only ‟killed” (i.e. cut) things, but also copied things
+  (defvaralias 'clip-ring 'kill-ring)) ; The ring of clippings includes not only ‟killed” (i.e. cut) things, but also copied things, like a clipboard does
 (defalias 'paste-rotate-reverse 'yank-pop) ; ‟pop” implies consumption, which yank-pop doesn't actually do
 
 
 ;;; Utilities
 
-;; My simple patches for beginning-of-buffer, end-of-buffer, and yank to take nomsg option, and yank to take nopushmark option, are cleaner, but the FSF doesn't want them, so this kludge is necessary.
+;; My simple patches for beginning-of-buffer, end-of-buffer, and yank to take nomsg option, yank to take nopushmark option, and set-mark to take dont-activate option, are cleaner, but the FSF doesn't want them, so this kludge is necessary.
 (defmacro define-nullifier (wrapper victim docstring)
   "Make a macro named WRAPPER that takes a body and evaluates it with function VICTIM nullified."
   `(defmacro ,wrapper (&rest body) ,docstring
@@ -356,13 +356,17 @@ Select the current logical line, and select more logical lines when point is mov
   nil " Line-Select" 'line-select-minor-mode-map
   (if (not line-select-minor-mode)
       (when lsmm-active (if lsmm-original-show-paren-status (show-paren-mode))
-	     (remove-hook 'post-command-hook 'lsmm-dominate-point-mark t)
-	     (remove-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark t)
-	     (setq lsmm-active nil))
+	    (remove-hook 'post-command-hook 'lsmm-dominate-point-mark t)
+	    (remove-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark t)
+	    ;; TODO: after Emacs fixes bug #19513, add:
+	    ;; (kill-local-variable shift-select-mode)
+	    (setq lsmm-active nil))
     (unless lsmm-active ; Line-select mode might already be active, so don't re-init
       (setq lsmm-original-show-paren-status show-paren-mode)
       (add-hook 'post-command-hook 'lsmm-dominate-point-mark nil t)
       (add-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark nil t)
+      ;; TODO: after Emacs fixes bug #19513, add:
+      ;; (if shift-select-mode (setq-local shift-select-mode nil))
       (setq lsmm-active t)
       ;; TODO: draw a thin horizontal black line the full width of the window, below the last selected text line (or above it, if point is before mark), for the same reason that I switch to vertical black line cursor between characters when mark is active and line-select mode isn't active. Then visually, the cursor has become that horizontal line.
       (show-paren-mode 0))
@@ -455,7 +459,7 @@ Change Emacs settings to ensure compatibility with Vimizer's cut-copy transient 
 Add hooks to set bar cursor when mark is active, and block cursor when mark is inactive.
 Bind Cut, Copy, Paste, and SunFront keys.
 
-Note: this function TURNS OFF `shift-select-mode'."
+Note: this function TURNS OFF `shift-select-mode' due to bug #19513." ; TODO: update after bug is fixed
 
   (unless (eq cursor-type t)
     (user-error "Aborting vimizer-init to avoid overriding your weirdo config"))
@@ -468,7 +472,7 @@ Note: this function TURNS OFF `shift-select-mode'."
   (blink-cursor-mode 0) ; Vimizer's cut-copy transient mode indicates activation by blinking the cursor
   (delete-selection-mode)
   (setq use-empty-active-region t)
-  (setq shift-select-mode nil)
+  (setq shift-select-mode nil) ; TODO: remove this after Emacs fixes bug #19513
 
   ;; Vimizer-specific features
   (add-hook 'deactivate-mark-hook 'line-select-minor-mode-disable) ; Whatever deactivates the mark (e.g. cut or copy, or keyboard-quit) also must deactivate line-select mode.
