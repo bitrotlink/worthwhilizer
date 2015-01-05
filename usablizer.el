@@ -722,6 +722,8 @@ If N is negative, don't delete newlines."
   (unless line-move-visual
     (user-error "Aborting usablizer-bind-keys to avoid overriding your weirdo config"))
 
+  (setq shift-select-mode nil) ; The Windintosh junk
+
   ;; Get rid of annoying new global keybindings in Emacs 24.3
   (global-unset-key [XF86Back]) ; By default bound to previous-buffer
   (global-unset-key [XF86Forward]) ; next-buffer

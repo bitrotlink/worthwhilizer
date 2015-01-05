@@ -1,5 +1,5 @@
 ;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
-;; Version: 0.1.2
+;; Version: 0.1.3
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
 
@@ -26,7 +26,7 @@
 ;; Press S-Paste to paste text from the head of the clip ring to a new line over the current line, regardless of where the cursor currently is on the line, and regardless of whether the pasted text was originally cut or copied as a full line. Because of this, if you press S-Cut followed by S-Paste, the text is cut and then pasted back in the same place, effectively undoing the cut. If you press S-Copy followed by S-Paste, the current line is duplicated.
 ;; Press S-SunFront to enter line-select mode. In this mode, complete logical lines are selected and highlighted, regardless of which commands you use to move the cursor. You can then cut or copy the selected text or do anything else that uses an active region. To cancel the mode, press whatever key or chord you have bound to keyboard-quit (C-g by default in Emacs).
 ;;
-;; Press M-Cut, M-Copy, M-S-Cut, or M-S-Copy to do the same as without the M, but append the cut or copied text to the end of the text at the head of the clip ring rather than pushing the cut or copied text to a new element on the clip ring.
+;; Press M-Cut, M-Copy, M-S-Cut, or M-S-Copy to do the same as without M, but append the cut or copied text to the end of the text at the head of the clip ring rather than pushing the cut or copied text to a new element on the clip ring.
 ;; Press M-Paste to reverse rotate through the clip ring and replace the last pasted text (this is Emacs's standard yank-pop). Press M-S-Paste to forward rotate. Press s-XF86Paste to paste the primary selection (OS-dependent).
 ;; Press SunFront to enter standard text-select mode (this is Emacs's standard push-mark-command).
 ;; Press M-SunFront to enter rectangle-select mode (Emacs's standard rectangle-mark-mode).
@@ -116,11 +116,13 @@ If region is active, then operate on all lines which are at least partially incl
 
 ;; Use block cursor when region is inactive, except in text-browse mode
 (defun vimizer-deactivate-mark ()
+  ;; text-browse is in Nicizer
   (setq cursor-type (if (bound-and-true-p text-browse-minor-mode) nil t)))
 
 ;; Use bar cursor when region is active, except in line-select mode
+(defvar line-select-minor-mode) ; Defined below; silence compiler warning here
 (defun vimizer-activate-mark ()
-  (setq cursor-type (if (bound-and-true-p line-select-minor-mode) nil 'bar)))
+  (setq cursor-type (if line-select-minor-mode nil 'bar)))
 
 (defun setnil (arg) (set arg nil))
 
@@ -134,7 +136,7 @@ If region is active, then operate on all lines which are at least partially incl
 
 ;; XXX: Elisp docstring syntax has no way to include other strings, so I can factor out common text?
 (defun cutline (&optional arg append)
-  "Cut the current line, or ARG lines.
+  "Cut the current logical line, or ARG lines.
 If region is active, then operate on all lines which are at least partially included in region."
   (interactive "p")
   (cut-copy-line #'not-presumptuous-cut-region t (or arg 1) append))
@@ -145,7 +147,7 @@ If region is active, then operate on all lines which are at least partially incl
   (cutline arg t))
 
 (defun copyline (&optional arg append)
-  "Copy the current line, or ARG lines.
+  "Copy the current logical line, or ARG lines.
 If region is active, then operate on all lines which are at least partially included in region."
   (interactive "p")
   (cut-copy-line #'not-presumptuous-copy-region nil (or arg 1) append))
@@ -357,6 +359,7 @@ Select the current logical line, and select more logical lines when point is mov
   (if (not line-select-minor-mode)
       (when lsmm-active (if lsmm-original-show-paren-status (show-paren-mode))
 	    (remove-hook 'post-command-hook 'lsmm-dominate-point-mark t)
+	    (remove-hook 'deactivate-mark-hook 'line-select-minor-mode-disable t)
 	    (remove-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark t)
 	    ;; TODO: after Emacs fixes bug #19513, add:
 	    ;; (kill-local-variable shift-select-mode)
@@ -364,6 +367,7 @@ Select the current logical line, and select more logical lines when point is mov
     (unless lsmm-active ; Line-select mode might already be active, so don't re-init
       (setq lsmm-original-show-paren-status show-paren-mode)
       (add-hook 'post-command-hook 'lsmm-dominate-point-mark nil t)
+      (add-hook 'deactivate-mark-hook 'line-select-minor-mode-disable t)
       (add-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark nil t)
       ;; TODO: after Emacs fixes bug #19513, add:
       ;; (if shift-select-mode (setq-local shift-select-mode nil))
@@ -386,13 +390,13 @@ Select the current logical line, and select more logical lines when point is mov
   (line-select-minor-mode))
 
 (defun backward-line (&optional arg)
-  "Opposite of Emacs's built-in forward-line."
+  "Opposite of Emacs's built-in `'forward-line', but with the latter's negation fixed."
   (interactive "p")
   (unless arg (setq arg 1))
   (if (< arg 1) (forward-line (- arg))
     (when (not (bolp))
       (move-beginning-of-line nil)
-      (setq arg (- arg 1)))
+      (setq arg (1- arg)))
     (forward-line (- arg))))
 
 ;; Set the start and end anchors for line-select mode.
@@ -450,6 +454,15 @@ Select the current logical line, and select more logical lines when point is mov
       (setq lsmm-point-is-past-anchor t))))
 
 
+;;; Miscellaneous
+
+(defun silent-push-mark-command ()
+  ;; "Mark set" message is superfluous, since Vimizer sets cursor type
+  "Push and activate mark silently."
+  (interactive)
+  (push-mark-command nil t))
+
+
 ;;; Init
 
 (defun vimizer-init ()
@@ -470,12 +483,12 @@ Note: this function TURNS OFF `shift-select-mode' due to bug #19513." ; TODO: up
     (user-error "This version of Vimizer only works with Emacs 24.4 or later")) ; At least because of the change to kill-region in 24.4, and probably other things I don't remember
 
   (blink-cursor-mode 0) ; Vimizer's cut-copy transient mode indicates activation by blinking the cursor
+  (setq shift-select-mode nil) ; TODO: remove this after Emacs fixes bug #19513
+  ;; TODO: Move these; not necessary here
   (delete-selection-mode)
   (setq use-empty-active-region t)
-  (setq shift-select-mode nil) ; TODO: remove this after Emacs fixes bug #19513
 
   ;; Vimizer-specific features
-  (add-hook 'deactivate-mark-hook 'line-select-minor-mode-disable) ; Whatever deactivates the mark (e.g. cut or copy, or keyboard-quit) also must deactivate line-select mode.
   (add-hook 'deactivate-mark-hook 'vimizer-deactivate-mark)
   (add-hook 'activate-mark-hook 'vimizer-activate-mark)
 
@@ -497,11 +510,8 @@ Note: this function TURNS OFF `shift-select-mode' due to bug #19513." ; TODO: up
      ([M-S-XF86Paste] paste-rotate)
      ([s-XF86Paste] paste-primary)
 
-     ;; Miscellaneous
-     ([SunFront] (lambda () ; X calls my setmark key ⌜SunFront⌝
-		   ;; "Mark set" message is superfluous, since Vimizer sets cursor type
-		   "Push and activate mark silently."
-		   (interactive) (push-mark-command nil t)))
+     ;; Text-selection commands
+     ([SunFront] silent-push-mark-command) ; X calls my setmark key ⌜SunFront⌝
      ([S-SunFront] line-select-minor-mode-enable)
      ([M-SunFront] rectangle-mark-mode))))
 
