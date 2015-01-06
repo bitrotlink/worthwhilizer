@@ -1,6 +1,6 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.1.2
-;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2"))
+;; Version: 0.1.3
+;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.2"))
 ;; Keywords: convenience
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -77,8 +77,8 @@
 
 (require 'misc)
 (require 'undo-tree)
+(require 'vimizer) ; For global-set-key-list
 (eval-when-compile (require 'cl))
-(eval-and-compile (require 'vimizer)) ; For the «silently» macro, and global-set-key-list
 
 (defalias 'isearch-truncate-or-abort 'isearch-abort) ; See isearch-really-abort
 
@@ -376,18 +376,6 @@ With optional LEVEL, go forward to end of nth containing list (default 1st)."
     (condition-case nil (progn (up-list level) (left-char))
       ('scan-error (user-error (if (and level (> level 1))
 				   (format "Not in %d lists" level) "Not in list"))))))
-
-(defun silent-beginning-of-buffer (arg)
-  "Do `beginning-of-buffer' without its message noise."
-  (interactive "P")
-  (silently (with-no-warnings ; Ugh
-	      (beginning-of-buffer arg))))
-
-(defun silent-end-of-buffer (arg)
-  "Do `end-of-buffer' without its message noise."
-  (interactive "P")
-  (silently (with-no-warnings
-	      (end-of-buffer arg))))
 
 ;; Derived from Emacs's zap-to-char
 ;; TODO: inclusive and exclusive find are implemented differently, for no good reason. Choose the better one, and do both that way.
@@ -828,8 +816,8 @@ If N is negative, don't delete newlines."
      ([S-end] end-list)
      ([M-S-home] beginning-of-visual-line)
      ([M-S-end] end-of-visual-line) ; FIXME (Emacs bug): works if word wrap enabled, but moves one too many chars if char wrap enabled and font is monospace.
-     ([M-home] silent-beginning-of-buffer)
-     ([M-end] silent-end-of-buffer)
+     ([M-home] beginning-of-buffer)
+     ([M-end] end-of-buffer)
      ;; Exclusive forward find-char paired with inclusive backward is intentional
      ([f21] find-char-exclusive)
      ([S-f21] backward-find-char-inclusive)
@@ -914,8 +902,7 @@ If N is negative, don't delete newlines."
      ;; TODO change scrolling for undo-tree visualizer to use scroll-lock-mode, or at least stop scrolling conservatively. Just setting scroll-conservatively with let binding doesn't work; global value has to be set. Maybe using make-local-variable?
      ([Scroll_Lock] scroll-lock-mode) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
      ([S-f17] check-parens-and-report)
-     ([M-f17] show-paren-mode)
-     ([M-S-f17] mark-whole-buffer)))
+     ([M-f17] show-paren-mode)))
 
   (mapc
    (lambda (x) (define-key universal-argument-map (car x) (cadr x)))

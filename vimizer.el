@@ -1,5 +1,5 @@
 ;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
-;; Version: 0.2.0
+;; Version: 0.2.2
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
 
@@ -152,7 +152,8 @@ This function replaces the weird and unnecessary arg handling of Emacs's standar
   (interactive "p")
   (unless arg (setq arg 1))
   (when (and (> arg 0) mark-active)
-    (delete-region (mark) (point)) ; Emacs replaces active region if I press C-y to call yank directly, but if I call yank here in this function, it doesn't.
+    (if delete-active-region
+	(delete-region (mark) (point))) ; Emacs replaces active region if I press C-y to call yank directly, but if I call yank here in this function, it doesn't.
     (line-select-minor-mode-disable)) ; Emacs apparently doesn't call deactivate-mark-hook (triggered by the above call to delete-region), and thus deactivate line-select minor mode, until after post-command-hook, so lsmm-dominate-point-mark would be superfluously called (and incorrectly position the point since it calculated the target position before the region was deleted), so I have to disable it here to prevent that.
   (while (> arg 0)
     (silently (yank))
@@ -164,7 +165,8 @@ This function replaces the weird and unnecessary arg handling of Emacs's standar
   (unless arg (setq arg 1))
   (when (> arg 0)
     (when mark-active
-      (delete-region (mark) (point)) ; See comment in not-weird-paste about this
+      (if delete-active-region
+	  (delete-region (mark) (point))) ; See comment in not-weird-paste about this
       (line-select-minor-mode-disable)) ; And about this too
     (move-beginning-of-line nil)
     (push-mark (point) t nil)
@@ -180,7 +182,8 @@ This function replaces the weird and unnecessary arg handling of Emacs's standar
   (unless arg (setq arg 1))
   (when (> arg 0)
     (when mark-active
-      (delete-region (mark) (point)) ; See comment in not-weird-paste about this
+      (if delete-active-region
+	  (delete-region (mark) (point))) ; See comment in not-weird-paste about this
       (line-select-minor-mode-disable)) ; And about this too
     (let ((start (point)))
       (forward-line)
@@ -363,14 +366,15 @@ Optional ARG is passed to the next command."
 Select the current logical line, and select more logical lines when point is moved. If the mark is already active, expand the current region to include whole logical lines."
   nil " Line-Select" 'line-select-minor-mode-map
   (if (not line-select-minor-mode)
-      (when lsmm-active (if lsmm-original-show-paren-status (show-paren-mode))
-	    (remove-hook 'post-command-hook 'lsmm-dominate-point-mark t)
-	    (remove-hook 'deactivate-mark-hook 'line-select-minor-mode-disable t)
-	    (remove-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark t)
-	    ;; TODO: after Emacs fixes bug #19513, add:
-	    ;; (kill-local-variable shift-select-mode) ; Nobody else uses it buffer-locally
-	    (setq cursor-type (unless (bound-and-true-p text-browse-minor-mode) t))
-	    (setq lsmm-active nil))
+      (when lsmm-active
+	(if lsmm-original-show-paren-status (show-paren-mode))
+	(remove-hook 'post-command-hook 'lsmm-dominate-point-mark t)
+	(remove-hook 'deactivate-mark-hook 'line-select-minor-mode-disable t)
+	(remove-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark t)
+	;; TODO: after Emacs fixes bug #19513, add:
+	;; (kill-local-variable shift-select-mode) ; Nobody else uses it buffer-locally
+	(setq cursor-type (unless (bound-and-true-p text-browse-minor-mode) t))
+	(setq lsmm-active nil))
     (unless transient-mark-mode
       (user-error "line-select not compatible with your luddite config"))
     (if shift-select-mode
@@ -465,15 +469,6 @@ Select the current logical line, and select more logical lines when point is mov
       (setq lsmm-point-is-past-anchor t))))
 
 
-;;; Miscellaneous
-
-(defun silent-push-mark-command ()
-  ;; "Mark set" message is superfluous, since Vimizer sets cursor type
-  "Push and activate mark silently."
-  (interactive)
-  (push-mark-command nil t))
-
-
 ;;; Init
 
 ;;;###autoload
@@ -500,9 +495,10 @@ See the Commentary section of vimizer.el for how these work."
      ([s-XF86Paste] paste-primary)
 
      ;; Text-selection commands
-     ([SunFront] silent-push-mark-command) ; X calls my setmark key ⌜SunFront⌝
+     ([SunFront] push-mark-command) ; X calls my setmark key ⌜SunFront⌝
      ([S-SunFront] line-select-minor-mode-enable)
-     ([M-SunFront] rectangle-mark-mode))))
+     ([M-SunFront] rectangle-mark-mode)
+     ([M-S-SunFront] mark-whole-buffer))))
 
 
 (provide 'vimizer)

@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.1.1
-;; Package-Requires: ((paredit FIXME) (usablizer "0.1.2"))
+;; Version: 0.1.2
+;; Package-Requires: ((undo-tree "0.6.5") (paredit FIXME) (vimizer "0.2.2") (usablizer "0.1.3"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -39,8 +39,10 @@
 
 (require 'whitespace)
 (require 'face-remap)
+(require 'undo-tree)
 (require 'paredit)
 (require 'usablizer)
+(eval-and-compile (require 'vimizer)) ; For the «silently» macro, and global-set-key-list
 
 
 ;;; Utilities
@@ -325,6 +327,24 @@ Uses web-browser-style keybindings."
   (text-browse-minor-mode 0)
   (read-only-mode 0))
 
+(defun silent-push-mark-command ()
+  ;; "Mark set" message is superfluous, since Nicizer sets cursor type with mark activation
+  "Push and activate mark silently."
+  (interactive)
+  (push-mark-command nil t))
+
+(defun silent-beginning-of-buffer (arg)
+  "Do `beginning-of-buffer' without its message noise."
+  (interactive "P")
+  (silently (with-no-warnings ; Ugh
+	      (beginning-of-buffer arg))))
+
+(defun silent-end-of-buffer (arg)
+  "Do `end-of-buffer' without its message noise."
+  (interactive "P")
+  (silently (with-no-warnings
+	      (end-of-buffer arg))))
+
 
 ;;; Init
 
@@ -357,7 +377,12 @@ Many others."
      ([M-menu] text-browse-minor-mode-toggle)
      ([M-XF86Back] zoom-standard)
      ([M-S-XF86Back] zoom-out)
-     ([M-S-XF86Forward] zoom-in)))
+     ([M-S-XF86Forward] zoom-in)
+
+     ;; Replace Vimizer and Usablizer bindings to reduce message noise
+     ([SunFront] silent-push-mark-command)
+     ([M-home] silent-beginning-of-buffer)
+     ([M-end] silent-end-of-buffer)))
 
   ;; Better access to the search history ring
   (ad-activate 'isearch-repeat-forward)
