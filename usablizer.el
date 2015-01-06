@@ -22,7 +22,7 @@
 ;; backward-word lands on the first preceding start of a word
 ;; forward-word lands following the next end of a word
 ;; forward-to-word lands on the next start of a word
-;; However, the standard s-exp-, defun-, and paragraph-based movement commands land on the wrong position, give inscrutable error messages, or are just plain missing. Usablizer replaces them with fixed versions. See the new commands' docstrings for details.
+;; However, the corresponding standard s-exp-, defun-, and paragraph-based movement commands land on the wrong position, give inscrutable error messages, or are just plain missing. Usablizer replaces them with fixed versions. See the new commands' docstrings for details.
 ;;
 ;; 1. A replacement for Emacs's point-losing pop-to-mark-command.
 ;; In Emacs, pop-to-mark-command loses the current point. That loss is annoying.
@@ -805,7 +805,7 @@ If N is negative, don't delete newlines."
   "Hijack the user's keybindings."
   (interactive)
   (unless line-move-visual
-    (user-error "usablizer-bind-keys not designed for your weirdo config"))
+    (user-error "usablizer-bind-keys is not designed for your weirdo config"))
   (vimizer-bind-keys) ; Emacs isn't usable without them
   (setq shift-select-mode nil) ; The Windintosh junk
 
@@ -957,7 +957,7 @@ If N is negative, don't delete newlines."
   ;; (define-key term-mode-map [escape] 'term-send-raw-meta)
 
   ;; Use the «find» key for isearch
-  ;; Can't do (global-set-key [find] "\C-s") because as http://www.xandr.net/.emacs says:
+  ;; XXX; Can't do (global-set-key [find] "\C-s") because as http://www.xandr.net/.emacs says:
   ;;	 it does not currently work to say
   ;;	   (global-set-key 'f3 "\C-x\C-f")
   ;;	 The reason is that macros can't do interactive things properly.

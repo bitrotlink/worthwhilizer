@@ -21,14 +21,15 @@
 ;; If the region is active, then Cut or Copy will simply cut or copy the region instead of entering the transient mode.
 ;;
 ;; 1. Vim-style line-based cutting, copying, pasting, and selection, and repeatable pasting.
-;; Press S-Cut or S-Copy to cut or copy the current logical line, regardless of where the cursor currently is on the line. Use a prefix arg to cut or copy the specified number of lines.
-;; Press Paste to paste text from the head of the clip ring. Use a prefix arg to paste the specified number of copies of that text.
-;; Press S-Paste to paste text from the head of the clip ring to a new line over the current logical line, regardless of where the cursor currently is on the line, and regardless of whether the pasted text was originally cut or copied as a full line. Because of this, if you press S-Cut followed by S-Paste, the text is cut and then pasted back in the same place, effectively undoing the cut. If you press S-Copy followed by S-Paste, the current logical line is duplicated.
-;; Press S-SunFront to enter line-select mode. In this mode, complete logical lines are selected and highlighted, regardless of which commands you use to move the cursor. You can then cut or copy the selected text or do anything else that uses an active region. To cancel the mode, press whatever key or chord you have bound to keyboard-quit (C-g by default in Emacs).
-;; Press M-Cut, M-Copy, M-S-Cut, or M-S-Copy to do the same as without M, but append the cut or copied text to the end of the text at the head of the clip ring rather than pushing the cut or copied text to a new element on the clip ring.
-;; Press M-Paste to reverse rotate through the clip ring and replace the last pasted text (this is Emacs's standard yank-pop). Press M-S-Paste to forward rotate. Press s-XF86Paste to paste the primary selection (OS-dependent).
-;; Press SunFront to enter standard text-select mode (this is Emacs's standard push-mark-command).
-;; Press M-SunFront to enter rectangle-select mode (Emacs's standard rectangle-mark-mode).
+;; Press these keys for these features:
+;; S-Cut or S-Copy: cut or copy the current logical line, regardless of where the cursor currently is on the line. Use a prefix arg to cut or copy the specified number of lines.
+;; Paste: paste text from the head of the clip ring. Use a prefix arg to paste the specified number of copies of that text.
+;; S-Paste: paste text from the head of the clip ring to a new line over the current logical line, regardless of where the cursor currently is on the line, and regardless of whether the pasted text was originally cut or copied as a full line. Because of this, if you press S-Cut followed by S-Paste, the text is cut and then pasted back in the same place, effectively undoing the cut. If you press S-Copy followed by S-Paste, the current logical line is duplicated.
+;; S-SunFront: enter line-select mode. In this mode, complete logical lines are selected and highlighted, regardless of which commands you use to move the cursor. You can then cut or copy the selected text or do anything else that uses an active region. To cancel the mode, press whatever key or chord you have bound to keyboard-quit (C-g by default in Emacs).
+;; M-Cut, M-Copy, M-S-Cut, or M-S-Copy: do the same as without M, but append the cut or copied text to the end of the text at the head of the clip ring rather than pushing the cut or copied text to a new element on the clip ring.
+;; M-Paste: reverse rotate through the clip ring and replace the last pasted text (this is Emacs's standard yank-pop). Press M-S-Paste to forward rotate. Press s-XF86Paste to paste the primary selection (OS-dependent).
+;; SunFront: enter standard text-select mode (this is Emacs's standard push-mark-command).
+;; M-SunFront: enter rectangle-select mode (Emacs's standard rectangle-mark-mode).
 ;;
 ;; If you don't have Cut, Copy, Paste, and SunFront keys, or if they're not in convenient locations, then get a better keyboard.
 ;; By the time the Cut, Copy, and Paste keys' names make their way to Emacs on X on Debian Linux (other systems not tried), those names are prefixed with ⌜XF86⌝, so the keybindings in this package use those prefixed names.
@@ -377,8 +378,8 @@ Select the current logical line, and select more logical lines when point is mov
 	(setq lsmm-active nil))
     (unless transient-mark-mode
       (user-error "line-select not compatible with your luddite config"))
-    (if shift-select-mode
-	(user-error "line-select not compatible with shift-select-mode")) ; TODO: remove this after Emacs fixes bug #19513
+    (if shift-select-mode ; TODO: remove this after Emacs fixes bug #19513
+	(user-error "line-select not compatible with shift-select-mode"))
     (unless lsmm-active ; Line-select mode might already be active, so don't re-init
       (setq lsmm-original-show-paren-status show-paren-mode)
       (add-hook 'post-command-hook 'lsmm-dominate-point-mark nil t)
