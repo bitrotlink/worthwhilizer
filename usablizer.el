@@ -1,6 +1,6 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.1.1
-;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.1"))
+;; Version: 0.1.2
+;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2"))
 ;; Keywords: convenience
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -788,10 +788,12 @@ If N is negative, don't delete newlines."
 ;; This is an essential usability issue, so I'm putting it at top level, not in a function
 (add-hook 'find-file-hook 'register-swap-back)
 
+;;;###autoload
 (defun usablizer-bind-keys ()
   "Hijack the user's keybindings."
+  (interactive)
   (unless line-move-visual
-    (user-error "Aborting usablizer-bind-keys to avoid overriding your weirdo config"))
+    (user-error "usablizer-bind-keys not designed for your weirdo config"))
 
   (setq shift-select-mode nil) ; The Windintosh junk
 

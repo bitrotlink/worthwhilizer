@@ -1,5 +1,5 @@
 ;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
-;; Version: 0.1.4
+;; Version: 0.2.0
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
 
@@ -37,7 +37,7 @@
 ;;
 ;; Unlike other vimization packages for Emacs (and Vim itself), Vimizer and Usablizer don't separate insertion and command modes, because such separation results in accidentally inserting the names of commands into buffers when you try to execute the commands, and accidentally mangling buffers with random edits when you try to insert text. Instead, these packages provide modeless bindings to function keys, so the commands are always available.
 ;;
-;; Note that Vimizer will globally TURN OFF shift-select-mode because it interacts poorly with Vimizer's line-select mode and can't be cleanly separated due to bug #19513 in Emacs 24.4. But shift-select is a waste of prime keychords anyway, even though it's widely popular. The traditional Emacs way (set the mark manually, then use normal motion commands to select text) is the right way, and with a non-chorded key (SunFront by default, in Vimizer's case) bound to push-mark-command, takes no extra keystrokes.
+;; Note that Emacs's shift-select-mode, enabled by default, interferes with Vimizer's line-select mode, and can't be cleanly separated due to bug #19513 in Emacs 24.4. But shift-select is a waste of prime keychords anyway, even though it's widely popular, so you should disable it. The traditional Emacs way (set the mark manually, then use normal motion commands to select text) is the right way, and with a non-chorded key (SunFront by default, in Vimizer's case) bound to push-mark-command, takes no extra keystrokes.
 
 
 ;;; Code:
@@ -113,16 +113,6 @@ If region is active, then operate on all lines which are at least partially incl
 	(if (not (= landing-column 0))
 	    (kill-append "\n" nil)))))) ; In case forward-line reached end of buffer and there was no EOL at the end. (I.e. end-of-buffer is serving as implicit EOL.)
 
-;; Use block cursor when region is inactive, except in text-browse mode
-(defun vimizer-deactivate-mark ()
-  ;; text-browse is in Nicizer
-  (setq cursor-type (if (bound-and-true-p text-browse-minor-mode) nil t)))
-
-;; Use bar cursor when region is active, except in line-select mode
-(defvar line-select-minor-mode) ; Defined below; silence compiler warning here
-(defun vimizer-activate-mark ()
-  (setq cursor-type (if line-select-minor-mode nil 'bar)))
-
 (defun setnil (arg) (set arg nil))
 
 (defun global-set-key-list (list)
@@ -166,7 +156,7 @@ This function replaces the weird and unnecessary arg handling of Emacs's standar
     (line-select-minor-mode-disable)) ; Emacs apparently doesn't call deactivate-mark-hook (triggered by the above call to delete-region), and thus deactivate line-select minor mode, until after post-command-hook, so lsmm-dominate-point-mark would be superfluously called (and incorrectly position the point since it calculated the target position before the region was deleted), so I have to disable it here to prevent that.
   (while (> arg 0)
     (silently (yank))
-    (setq arg (- arg 1))))
+    (setq arg (1- arg))))
 
 (defun paste-over (&optional arg)
   "Paste over current logical line. Optionally repeat ARG times."
@@ -181,7 +171,7 @@ This function replaces the weird and unnecessary arg handling of Emacs's standar
     (while (> arg 0)
       (not-pushily (yank))
       (unless (bolp) (newline))
-      (setq arg (- arg 1)))))
+      (setq arg (1- arg)))))
 
 ;; I don't need paste-under after all (I was brainwashed by Vim); paste-over suffices
 (defun paste-under (&optional arg)
@@ -202,7 +192,7 @@ This function replaces the weird and unnecessary arg handling of Emacs's standar
 	  (while (> arg 0)
 	    (not-pushily (yank))
 	    (unless (bolp) (newline)) ; In case last line of pasted text had no trailing EOL
-	    (setq arg (- arg 1))))))))
+	    (setq arg (1- arg))))))))
 
 (defun paste-rotate (&optional arg)
   "Like `paste-rotate-reverse', but with forward rotation of the clip ring."
@@ -233,7 +223,8 @@ This is the equivalent of `mouse-yank-primary', but suitable for keyboard bindin
     cctm-anchor
     cctm-buffer-of-anchor
     cctm-window-of-anchor
-    cctm-frame-of-anchor))
+    cctm-frame-of-anchor
+    cctm-original-blink-cursor-status))
 
 ;; Doesn't work, since defvar is not a function:
 ;; (mapc #'defvar cctm-vars)
@@ -251,6 +242,7 @@ This is the equivalent of `mouse-yank-primary', but suitable for keyboard bindin
 (defvar cctm-buffer-of-anchor nil)
 (defvar cctm-window-of-anchor nil)
 (defvar cctm-frame-of-anchor nil)
+(defvar cctm-original-blink-cursor-status nil)
 
 (defun modal-cut (&optional arg append)
   "Cut using Vim-style motion-composed transient mode.
@@ -296,7 +288,9 @@ Optional ARG is passed to the next command."
 	cctm-buffer-of-anchor (current-buffer)
 	cctm-window-of-anchor (selected-window)
 	cctm-frame-of-anchor (selected-frame))
-  (blink-cursor-mode) ; Visually indicate that mode is active
+  (unless cctm-original-blink-cursor-status ; In case user activates twice
+    (setq cctm-original-blink-cursor-status (if blink-cursor-mode 1 0)))
+  (blink-cursor-mode) ; Visually indicate cctm is active
   (add-hook 'post-command-hook 'cctm-maybe-cut-copy)) ; Intentionally not buffer-local
 
 ;; If in cut-copy transient mode, do cut or copy with next motion command
@@ -324,13 +318,24 @@ Optional ARG is passed to the next command."
   (save-selected-window ; In case top-level command selected a different window
     (if cctm-window-of-anchor (select-window cctm-window-of-anchor t))
     (unless mark-active (setq cursor-type ; Last command might have set mark active, and activating mark sets cursor type to bar, so don't interfere with that.
-			      (if (bound-and-true-p text-browse-minor-mode) nil t))))
+			      (unless (bound-and-true-p text-browse-minor-mode) t))))
+  (blink-cursor-mode
+   (case cctm-original-blink-cursor-status
+     (0 0)
+     (1 1)
+     ;; Needed for when cctm-exit is called when cctm isn't active
+     (t (or blink-cursor-mode 0)))) ; I.e. don't change it
   (mapc #'setnil cctm-vars)
-  (blink-cursor-mode 0)
   (remove-hook 'post-command-hook 'cctm-maybe-cut-copy))
 
 
 ;;; Vim-style line-select minor mode
+;; The implementation is necessarily hairy in order to work exactly right. In particular:
+;; crossing the anchor line without glitches
+;; allowing arbitrary motion commands
+;; correctly operating at the end of the buffer regardless of whether there's a newline at the end
+;; sensibly handling exchange-point-and-mark
+;; sensibly handling mode activation when there's already an active region spanning multiple logical lines
 
 (defvar lsmm-anchor-line-beginning nil)
 (defvar lsmm-anchor-line-end nil)
@@ -363,8 +368,13 @@ Select the current logical line, and select more logical lines when point is mov
 	    (remove-hook 'deactivate-mark-hook 'line-select-minor-mode-disable t)
 	    (remove-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark t)
 	    ;; TODO: after Emacs fixes bug #19513, add:
-	    ;; (kill-local-variable shift-select-mode)
+	    ;; (kill-local-variable shift-select-mode) ; Nobody else uses it buffer-locally
+	    (setq cursor-type (unless (bound-and-true-p text-browse-minor-mode) t))
 	    (setq lsmm-active nil))
+    (unless transient-mark-mode
+      (user-error "line-select not compatible with your luddite config"))
+    (if shift-select-mode
+	(user-error "line-select not compatible with shift-select-mode")) ; TODO: remove this after Emacs fixes bug #19513
     (unless lsmm-active ; Line-select mode might already be active, so don't re-init
       (setq lsmm-original-show-paren-status show-paren-mode)
       (add-hook 'post-command-hook 'lsmm-dominate-point-mark nil t)
@@ -403,6 +413,7 @@ Select the current logical line, and select more logical lines when point is mov
 ;; Set the start and end anchors for line-select mode.
 ;; If the mark is active and RESET is nil, extend the current region to include whole logical lines rather than resetting the region to include just the current logical line.
 (defun lsmm-set-anchors (reset)
+  (setq cursor-type nil)
   (if (and mark-active (not reset))
       (let* ((old-mark (mark))
 	     (old-point (point))
@@ -414,7 +425,6 @@ Select the current logical line, and select more logical lines when point is mov
 	(backward-line)
 	(setq lsmm-anchor-line-beginning (point))
 	(goto-char old-point) ; post-command-hook has lsmm-dominate-point-mark which will adjust point as necessary after this
-	(setq cursor-type nil)
 	(setq lsmm-point-is-past-anchor (> (point) lsmm-anchor-line-beginning)))
     (forward-line)
     (push-mark (point) t t)
@@ -466,33 +476,11 @@ Select the current logical line, and select more logical lines when point is mov
 
 ;;; Init
 
-(defun vimizer-init ()
-  "Hijack the user's settings and keybindings.
-
-Change Emacs settings to ensure compatibility with Vimizer's cut-copy transient mode and line-select mode.
-Add hooks to set bar cursor when mark is active, and block cursor when mark is inactive.
-Bind Cut, Copy, Paste, and SunFront keys.
-
-Note: this function TURNS OFF `shift-select-mode' due to bug #19513." ; TODO: update after bug is fixed
-
-  (unless (eq cursor-type t)
-    (user-error "Aborting vimizer-init to avoid overriding your weirdo config"))
-  (unless transient-mark-mode
-    (user-error "Aborting vimizer-init to avoid overriding your luddite config"))
-  (unless (or (and (= emacs-major-version 24) (>= emacs-minor-version 4))
-	      (>= emacs-major-version 25))
-    (user-error "This version of Vimizer only works with Emacs 24.4 or later")) ; At least because of the change to kill-region in 24.4, and probably other things I don't remember
-
-  (blink-cursor-mode 0) ; Vimizer's cut-copy transient mode indicates activation by blinking the cursor
-  (setq shift-select-mode nil) ; TODO: remove this after Emacs fixes bug #19513
-  ;; TODO: Move these; not necessary here
-  (delete-selection-mode)
-  (setq use-empty-active-region t)
-
-  ;; Vimizer-specific features
-  (add-hook 'deactivate-mark-hook 'vimizer-deactivate-mark)
-  (add-hook 'activate-mark-hook 'vimizer-activate-mark)
-
+;;;###autoload
+(defun vimizer-bind-keys ()
+  " Bind the Cut, Copy, Paste, and SunFront keys to Vimizer's functions.
+See the Commentary section of vimizer.el for how these work."
+  (interactive)
   (global-set-key-list
    '(
 

@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.1
-;; Package-Requires: ((paredit FIXME) (usablizer "0.1"))
+;; Version: 0.1.1
+;; Package-Requires: ((paredit FIXME) (usablizer "0.1.2"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -183,6 +183,18 @@ Show nothing when they're on, to avoid cluttering the mode line."
 (defun maybe-flyspell-buffer ()
   (if flyspell-mode (flyspell-buffer)))
 
+(defvar text-browse-minor-mode) ; Defined below; silence compiler warning here
+;; Use block cursor when region is inactive, except in text-browse mode
+;; Add this to deactivate-mark-hook
+(defun nicizer-deactivate-mark ()
+  (setq cursor-type (if text-browse-minor-mode nil t)))
+
+;; Use bar cursor when region is active, except in line-select mode
+;; Add this to activate-mark-hook
+(defun nicizer-activate-mark ()
+  ;; line-select is in Vimizer
+  (setq cursor-type (if (bound-and-true-p line-select-minor-mode) nil 'bar)))
+
 
 ;;; Fix whitespace-mode brokenness
 
@@ -240,12 +252,12 @@ Besides the choice of face, it is the same as `buffer-face-mode', but quiet."
 ;;; Text-Browse minor mode
 
 ;; Emacs's view-mode implements a bunch of keys which I neither need nor want, and doesn't implement some that I do (e.g. up and down arrows scroll the window rather than move the cursor), and doesn't hide the cursor, or enable word-wrap. Text-Browse minor mode solves this.
-(defvar tbmm-initial-read-only nil)
-(defvar tbmm-initial-show-paren nil)
-(defvar tbmm-initial-line-wrap nil)
-(make-variable-buffer-local 'tbmm-initial-read-only)
-(make-variable-buffer-local 'tbmm-initial-show-paren)
-(make-variable-buffer-local 'tbmm-initial-line-wrap)
+(defvar tbmm-original-read-only nil)
+(defvar tbmm-original-show-paren nil)
+(defvar tbmm-original-line-wrap nil)
+(make-variable-buffer-local 'tbmm-original-read-only)
+(make-variable-buffer-local 'tbmm-original-show-paren)
+(make-variable-buffer-local 'tbmm-original-line-wrap)
 
 (defvar text-browse-minor-mode-map (make-keymap))
 (mapc (lambda (x) (define-key text-browse-minor-mode-map (car x) (cadr x)))
@@ -266,18 +278,18 @@ Uses web-browser-style keybindings."
   nil " Text-Browse" 'text-browse-minor-mode-map
   (if text-browse-minor-mode
       (progn
-	(setq tbmm-initial-read-only buffer-read-only)
+	(setq tbmm-original-read-only buffer-read-only)
 	(read-only-mode)
-	(setq tbmm-initial-show-paren show-paren-mode)
+	(setq tbmm-original-show-paren show-paren-mode)
 	(show-paren-mode 0)
-	(setq tbmm-initial-line-wrap (get-line-wrap))
+	(setq tbmm-original-line-wrap (get-line-wrap))
 	(set-line-wrap 'word)
 	(unless mark-active (setq cursor-type nil)))
     (progn
-      (read-only-mode (if tbmm-initial-read-only t 0)) ; Can't just do (read-only-mode tbmm-initial-read-only) because Emacs's API is demented
-      (show-paren-mode (if tbmm-initial-show-paren t 0))
-      (set-line-wrap tbmm-initial-line-wrap)
-      (unless line-select-minor-mode
+      (read-only-mode (or tbmm-original-read-only 0)) ; Emacs's demented API
+      (show-paren-mode (or tbmm-original-show-paren 0))
+      (set-line-wrap tbmm-original-line-wrap)
+      (unless (bound-and-true-p line-select-minor-mode)
 	(setq cursor-type (if mark-active 'bar t))))))
 
 (defun text-browse-minor-mode-toggle ()
@@ -316,10 +328,15 @@ Uses web-browser-style keybindings."
 
 ;;; Init
 
+;;;###autoload
 (defun nicizer-init ()
-  "Hijack the user's settings and keybindings."
+  "Hijack the user's settings and keybindings.
+Add hooks to set bar cursor when mark is active, and block cursor when mark is inactive.
+Show whitespace, set variable-pitch font, unclutter the mode line.
+Many others."
+  (interactive)
   ;; usablizer-bind-keys omitted here because everybody would whine about it
-  (vimizer-init)
+  (vimizer-bind-keys)
   (global-set-key-list
    `(([M-S-f13] paredit-mode)
 
@@ -374,6 +391,7 @@ Uses web-browser-style keybindings."
   (setq undo-tree-visualizer-diff t) ; FIXME: not persisting, apparently bug in undo-tree, despite var being set buffer-local before being set to nil
   (maybe-set 'mark-ring-max 32) ; With both reverse and forward rotation provided in Usablizer, a large ring is wieldy. But don't override user's custom config.
   (maybe-set 'diff-switches "-u")
+  (setq use-empty-active-region t)
   (setq save-interprogram-paste-before-kill t)
   (setq switch-to-buffer-preserve-window-point t)
   (setq scroll-preserve-screen-position t)
@@ -386,7 +404,9 @@ Uses web-browser-style keybindings."
   (electric-pair-mode)
   (show-paren-mode)
   (winner-mode)
-  (global-undo-tree-mode)
+  (delete-selection-mode) ; XXX: Really belongs in usablizer
+  (global-undo-tree-mode) ; XXX: Ditto
+  (blink-cursor-mode 0)
   (menu-bar-mode 0) ; Permanent menu bar is pointless; use menu-bar-open
   (tool-bar-mode 0)
   (put 'narrow-to-region 'disabled nil)
@@ -422,10 +442,13 @@ Uses web-browser-style keybindings."
 	    shell-mode-hook ; Because many commands' output formats, e.g. from ⌜ls -l⌝, have the same problem that dired-mode has
 	    eshell-mode-hook ; Ditto
 	    prog-mode-hook))) ; Sop to the luddites
-  (add-hook 'buffer-face-mode-hook 'set-monospace-mode-lighter)
 
-  (add-hook 'flyspell-mode-hook 'maybe-flyspell-buffer)
-  (add-hook 'rotate-mark-ring-hook 'track-mark-ring-position)) ; See Usablizer
+  (mapc (lambda (x) (add-hook (car x) (cadr x)))
+	'((buffer-face-mode-hook set-monospace-mode-lighter)
+	  (deactivate-mark-hook nicizer-deactivate-mark)
+	  (activate-mark-hook nicizer-activate-mark)
+	  (rotate-mark-ring-hook track-mark-ring-position) ; See Usablizer
+	  (flyspell-mode-hook maybe-flyspell-buffer))))
 
 
 (provide 'nicizer)
