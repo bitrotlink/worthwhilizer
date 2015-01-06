@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.1.3
+;; Version: 0.1.4
 ;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.2"))
 ;; Keywords: convenience
 
@@ -75,7 +75,8 @@
 
 ;;; Code:
 
-(require 'misc)
+(require 'misc) ; For forward-to-word
+(require 'delsel) ; For minibuffer-keyboard-quit
 (require 'undo-tree)
 (require 'vimizer) ; For global-set-key-list
 (eval-when-compile (require 'cl))
@@ -126,6 +127,29 @@
   (cond (truncate-lines 'off)
 	(word-wrap 'word)
 	(t 'char)))
+
+(defun fix-minibuffer-maps ()
+  ;; Derived from delsel.el
+  (mapc (lambda (x)
+	  (define-key x [remap keyboard-quit] 'minibuffer-keyboard-quit))
+	(list
+	 minibuffer-local-map
+	 minibuffer-local-ns-map
+	 minibuffer-local-completion-map
+	 minibuffer-local-must-match-map
+	 minibuffer-local-isearch-map))
+  (define-key minibuffer-local-isearch-map [find] 'isearch-forward-exit-minibuffer)
+  (define-key minibuffer-local-isearch-map [S-find] 'isearch-reverse-exit-minibuffer))
+
+(defun fix-isearch-map ()
+  ;; Derived from http://xahlee.org/emacs/reclaim_keybindings.html
+  (mapc (lambda (x) (define-key isearch-mode-map (car x) (cadr x)))
+	'(([find] isearch-repeat-forward)
+	  ([S-find] isearch-repeat-backward)
+	  ([XF86Paste] isearch-yank-pop)
+	  ([remap keyboard-quit] isearch-really-abort)
+	  ;; ([remap partial-escape] isearch-truncate-or-abort) ; XXX: Doesn't work, I don't know why, and don't care anymore. Hardcoding to S-escape solves the problem.
+	  ([S-escape] isearch-truncate-or-abort))))
 
 ;; Change a setting only if the user hasn't already customized it
 (defun maybe-set (sym val)
@@ -782,7 +806,7 @@ If N is negative, don't delete newlines."
   (interactive)
   (unless line-move-visual
     (user-error "usablizer-bind-keys not designed for your weirdo config"))
-
+  (vimizer-bind-keys) ; Emacs isn't usable without them
   (setq shift-select-mode nil) ; The Windintosh junk
 
   ;; Get rid of annoying new global keybindings in Emacs 24.3
@@ -926,19 +950,7 @@ If N is negative, don't delete newlines."
   (global-set-key [S-escape] 'partial-escape)
   (global-set-key [M-escape] 'not-annoying-keyboard-escape-quit)
   (global-set-key [M-S-escape] esc-map) ; In case esc-map is actually needed for something (unlikely)
-  ;; The following is the proper way to do mode-specific escaping, which is why Emacs doesn't do it this way by default
-  (define-key isearch-mode-map [remap keyboard-quit] 'isearch-really-abort)
-  (define-key isearch-mode-map [remap partial-escape] 'isearch-truncate-or-abort)
   (define-key undo-tree-visualizer-mode-map [remap keyboard-quit] 'undo-tree-visualizer-quit)
-  ;; ...and some more (these ones derived from delsel.el)
-  (mapc (lambda (x)
-	  (define-key x [remap keyboard-quit] 'minibuffer-keyboard-quit))
-	(list
-	 minibuffer-local-map
-	 minibuffer-local-ns-map
-	 minibuffer-local-completion-map
-	 minibuffer-local-must-match-map
-	 minibuffer-local-isearch-map))
 
   ;; FIXME: I want to send escape in term mode rather than interpret it in Emacs.
   ;; But the following doesn't work, and I don't know why:
@@ -953,12 +965,13 @@ If N is negative, don't delete newlines."
   ;; Yay, Emacs.
   (global-set-key [find] 'isearch-forward)
   (global-set-key [S-find] 'isearch-backward)
-  (define-key minibuffer-local-isearch-map [find] 'isearch-forward-exit-minibuffer)
-  (define-key minibuffer-local-isearch-map [S-find] 'isearch-reverse-exit-minibuffer)
-  ;; Derived from http://xahlee.org/emacs/reclaim_keybindings.html
-  (define-key isearch-mode-map [find] 'isearch-repeat-forward)
-  (define-key isearch-mode-map [S-find] 'isearch-repeat-backward)
-  (define-key isearch-mode-map [XF86Paste] 'isearch-yank-pop))
+
+  ;; XXX: Manual section «(emacs) Init Rebinding» says I'm supposed to do this:
+  ;; (add-hook 'minibuffer-setup-hook 'fix-minibuffer-maps)
+  ;; (add-hook 'isearch-mode-hook 'fix-isearch-map)
+  ;; But this seems to work just as well:
+  (fix-minibuffer-maps)
+  (fix-isearch-map))
 
 
 (provide 'usablizer)
