@@ -429,7 +429,7 @@ Many others."
   (electric-pair-mode)
   (show-paren-mode)
   (winner-mode)
-  (delete-selection-mode) ; XXX: Really belongs in usablizer
+  (delete-selection-mode) ; XXX: Really belongs in Usablizer
   (global-undo-tree-mode) ; XXX: Ditto
   (blink-cursor-mode 0)
   (menu-bar-mode 0) ; Permanent menu bar is pointless; use menu-bar-open

@@ -22,7 +22,7 @@
 ;; backward-word lands on the first preceding start of a word
 ;; forward-word lands following the next end of a word
 ;; forward-to-word lands on the next start of a word
-;; However, the corresponding standard s-exp-, defun-, and paragraph-based movement commands land on the wrong position, give inscrutable error messages, or are just plain missing. Usablizer replaces them with fixed versions. See the new commands' docstrings for details.
+;; However, the corresponding standard s-exp-, defun-, and paragraph-based movement commands land on the wrong position, give inscrutable error messages, interpret their arguments incorrectly, or are just plain missing. Usablizer introduces the three missing combinations, and fixes the six others. See the new commands' docstrings for details.
 ;;
 ;; 1. A replacement for Emacs's point-losing pop-to-mark-command.
 ;; In Emacs, pop-to-mark-command loses the current point. That loss is annoying.
@@ -77,8 +77,8 @@
 
 (require 'misc) ; For forward-to-word
 (require 'delsel) ; For minibuffer-keyboard-quit
-(require 'undo-tree)
-(require 'vimizer) ; For global-set-key-list
+(require 'undo-tree) ; Emacs isn't usable without it
+(require 'vimizer) ; For global-set-key-list and vimizer-bind-keys
 (eval-when-compile (require 'cl))
 
 (defalias 'isearch-truncate-or-abort 'isearch-abort) ; See isearch-really-abort
@@ -252,14 +252,14 @@ If `mark' is nil but there's at least one non-nil marker on the ring, move it to
 
 ;;; Movement commands
 
-(defun back-sexp (&optional arg)
+(defun uf-backward-sexp (&optional arg)
   "Do `backward-sexp' but report more user-friendly errors."
   (interactive "p")
   (unless arg (setq arg 1))
   (condition-case nil (backward-sexp arg)
     ('scan-error (user-error (sexp-error-message arg -1)))))
 
-(defun end-sexp (&optional arg)
+(defun uf-forward-sexp (&optional arg)
   "Do `forward-sexp' but report more user-friendly errors."
   (interactive "p")
   (unless arg (setq arg 1))
@@ -271,7 +271,7 @@ If `mark' is nil but there's at least one non-nil marker on the ring, move it to
   "Move forward to beginning of next sexp."
   (interactive "p")
   (unless arg (setq arg 1))
-  (if (< arg 1) (end-sexp arg) ; Backward (and zero) movement are as usual
+  (if (< arg 1) (uf-forward-sexp arg) ; Backward (and zero) movement are as usual
     (let ((start (point)))
       (let ((target
 	     (condition-case nil
@@ -330,7 +330,7 @@ Leave point at the end of the defun where it ought to be, rather than at the beg
 
 (defun not-weird-backward-paragraph (&optional arg)
   "Like `backward-paragraph', but not weird.
-Land on start of paragraph, like backward-word lands on start of word."
+Land on start of paragraph, like `backward-word' lands on start of word."
   (interactive "p")
   (unless arg (setq arg 1))
   (if (< arg 0) (forward-to-paragraph (- arg)))
@@ -824,8 +824,8 @@ If N is negative, don't delete newlines."
      ([f24] forward-to-word)
      ([f15] reverse-rotate-mark-ring-and-point)
      ([S-f15] rotate-mark-ring-and-point)
-     ([C-S-left] back-sexp) ; Using C-left and C-right for bw_word and end_wrd keys, so I get S-bw_word and S-end_wrd for back-sexp and end-sexp
-     ([C-S-right] end-sexp)
+     ([C-S-left] uf-backward-sexp) ; Using C-left and C-right for bw_word and end_wrd keys, so I get S-bw_word and S-end_wrd for uf-backward-sexp and uf-forward-sexp
+     ([C-S-right] uf-forward-sexp)
      ([S-f24] forward-to-sexp)
      ([C-M-S-left] not-weird-beginning-of-defun)
      ([C-M-S-right] not-weird-end-of-defun)

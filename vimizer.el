@@ -27,7 +27,7 @@
 ;; S-Paste: paste text from the head of the clip ring to a new line over the current logical line, regardless of where the cursor currently is on the line, and regardless of whether the pasted text was originally cut or copied as a full line. Because of this, if you press S-Cut followed by S-Paste, the text is cut and then pasted back in the same place, effectively undoing the cut. If you press S-Copy followed by S-Paste, the current logical line is duplicated.
 ;; S-SunFront: enter line-select mode. In this mode, complete logical lines are selected and highlighted, regardless of which commands you use to move the cursor. You can then cut or copy the selected text or do anything else that uses an active region. To cancel the mode, press whatever key or chord you have bound to keyboard-quit (C-g by default in Emacs).
 ;; M-Cut, M-Copy, M-S-Cut, or M-S-Copy: do the same as without M, but append the cut or copied text to the end of the text at the head of the clip ring rather than pushing the cut or copied text to a new element on the clip ring.
-;; M-Paste: reverse rotate through the clip ring and replace the last pasted text (this is Emacs's standard yank-pop). Press M-S-Paste to forward rotate. Press s-XF86Paste to paste the primary selection (OS-dependent).
+;; M-Paste: reverse rotate through the clip ring and replace the last pasted text (this is Emacs's standard yank-pop). Press M-S-Paste to forward rotate. Press s-Paste to paste the primary selection (OS-dependent).
 ;; SunFront: enter standard text-select mode (this is Emacs's standard push-mark-command).
 ;; M-SunFront: enter rectangle-select mode (Emacs's standard rectangle-mark-mode).
 ;;
@@ -372,20 +372,20 @@ Select the current logical line, and select more logical lines when point is mov
 	(remove-hook 'post-command-hook 'lsmm-dominate-point-mark t)
 	(remove-hook 'deactivate-mark-hook 'line-select-minor-mode-disable t)
 	(remove-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark t)
-	;; TODO: after Emacs fixes bug #19513, add:
+	;; FIXME: after Emacs fixes bug #19513, add:
 	;; (kill-local-variable shift-select-mode) ; Nobody else uses it buffer-locally
 	(setq cursor-type (unless (bound-and-true-p text-browse-minor-mode) t))
 	(setq lsmm-active nil))
     (unless transient-mark-mode
       (user-error "line-select not compatible with your luddite config"))
-    (if shift-select-mode ; TODO: remove this after Emacs fixes bug #19513
+    (if shift-select-mode ; FIXME: remove this after Emacs fixes bug #19513
 	(user-error "line-select not compatible with shift-select-mode"))
     (unless lsmm-active ; Line-select mode might already be active, so don't re-init
       (setq lsmm-original-show-paren-status show-paren-mode)
       (add-hook 'post-command-hook 'lsmm-dominate-point-mark nil t)
       (add-hook 'deactivate-mark-hook 'line-select-minor-mode-disable t)
       (add-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark nil t)
-      ;; TODO: after Emacs fixes bug #19513, add:
+      ;; FIXME: after Emacs fixes bug #19513, add:
       ;; (if shift-select-mode (setq-local shift-select-mode nil))
       (setq lsmm-active t)
       ;; TODO: draw a thin horizontal black line the full width of the window, below the last selected text line (or above it, if point is before mark), for the same reason that I switch to vertical black line cursor between characters when mark is active and line-select mode isn't active. Then visually, the cursor has become that horizontal line.
