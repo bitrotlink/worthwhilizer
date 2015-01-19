@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.1.2
-;; Package-Requires: ((undo-tree "0.6.5") (paredit FIXME) (vimizer "0.2.2") (usablizer "0.1.3"))
+;; Version: 0.2
+;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.2") (usablizer "0.2"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -37,13 +37,34 @@
 
 ;;; Code:
 
+;; TODO:
+;; Require workgroups2, in order to get the per-workgroup winner-undo feature.
+;; Require desktop, in order to provide closed-buffer tracking (which relies on desktop.el), even though by default it won't be saved (make sure desktop not set to save or load by default).
+;; replace paredit by smartparens
+
 (require 'whitespace)
 (require 'face-remap)
+(require 'savehist)
+(require 'desktop)
+(require 'message)
+(require 'eldoc)
+(require 'ido)
+(require 'dired-x) ; For dired-jump
+(load "cl-seq") ; For the CL «position» and «intersection»
+(eval-and-compile
+  (require 'cl) ; Load-time too, for «position» and «intersection» aliases
+  (require 'vimizer)) ; For the «silently» macro, and global-set-key-list
 (require 'undo-tree)
-(require 'paredit)
+(require 'workgroups)  ; TODO: Switch to workgroups2
+(require 'paredit) ; FIXME: maybe not
+(require 'expand-region) ; FIXME: maybe not
+(require 'highlight-symbol) ; FIXME: probably not
 (require 'usablizer)
-(eval-and-compile (require 'vimizer)) ; For the «silently» macro, and global-set-key-list
 
+;; Silence byte compiler
+(declare-function 'position "cl")
+(declare-function 'intersection "cl")
+;; ...but it whines about them anyway. Yay, Emacs.
 
 ;;; Utilities
 
@@ -112,6 +133,13 @@ The mode is set by `set-line-wrap'.")
 			 whitespace-mode-off-lighter
 			 undo-tree-off-lighter))
 
+;; Necessary to enable the lighters to work:
+(put 'undo-tree-off-lighter 'risky-local-variable t)
+(put 'undo-tree-maybe-lighter 'risky-local-variable t)
+(put 'whitespace-mode-off-lighter 'risky-local-variable t)
+(put 'whitespace-mode-maybe-lighter 'risky-local-variable t)
+(put 'long-lines-lighter 'risky-local-variable t)
+
 (defun insert-after-modes (elt)
   "Insert ELT to default mode line after position of mode indicators."
   (let ((pos (position 'mode-line-modes mode-line-format)))
@@ -145,7 +173,6 @@ Show nothing when they're on, to avoid cluttering the mode line."
   (mapc #'delete-from-mode-line quiet-lighters)
   (force-mode-line-update))
 
-;; TODO: switch to new advice system
 (defun up-down-ring-isearch ()
   "Use up and down arrow keys after isearch to select a search string from the ring. This is more convenient than pressing M-p and M-n. Enable by adding this function to `isearch-mode-hook'."
   (unless (memq this-command ; Emacs is so gay
@@ -164,19 +191,20 @@ Show nothing when they're on, to avoid cluttering the mode line."
   (define-key isearch-mode-map [up] nil)
   (remove-hook 'post-command-hook 'maybe-remove-up-down-ring))
 
-(defadvice isearch-repeat-forward (after no-up-down-ring-after-isearch-repeat)
+;; Advice for isearch-repeat-forward
+(defun isearch-repeat-forward--remove-up-down-ring ()
   "After the first time isearch is repeated, remove up and down mapping for ring movement, so that up or down will exit isearch as is standard for Emacs, instead of trying to move in the search ring, which is no longer useful after isearch has been repeated (which means the user has already found the history item he was looking for)."
   (remove-up-down-ring))
 
-(defadvice isearch-repeat-backward (after no-up-down-ring-after-isearch-repeat-1)
+(defun isearch-repeat-backward--remove-up-down-ring ()
   "Supplement to no-up-down-ring-after-isearch-repeat"
   (remove-up-down-ring))
 
-(defadvice isearch-forward-exit-minibuffer (before no-up-down-ring-after-isearch-repeat-2)
+(defun isearch-forward-exit-minibuffer--remove-up-down-ring ()
   "Supplement to no-up-down-ring-after-isearch-repeat"
   (remove-up-down-ring))
 
-(defadvice isearch-reverse-exit-minibuffer (before no-up-down-ring-after-isearch-repeat-3)
+(defun isearch-reverse-exit-minibuffer--remove-up-down-ring ()
   "Supplement to no-up-down-ring-after-isearch-repeat"
   (remove-up-down-ring))
 
@@ -197,6 +225,83 @@ Show nothing when they're on, to avoid cluttering the mode line."
   ;; line-select is in Vimizer
   (setq cursor-type (if (bound-and-true-p line-select-minor-mode) nil 'bar)))
 
+(defun ido-disable-line-trucation () (set (make-local-variable 'truncate-lines) nil))
+
+;; The following enables pressing SunOpen twice to create and switch to a new buffer, and S-SunOpen twice to do dired-jump. (Usablizer's related global keybindings enable pressing SunOpen once to open buffer switcher, or S-SunOpen once to open file finder.)
+(defun nicizer-ido-keys () ; Add this to ido-setup-hook
+;;  (define-key ido-completion-map '[SunOpen] 'ido-enter-find-file) ; Don't want after all
+  (define-key ido-completion-map '[SunOpen] 'switch-to-new-buffer)
+  (define-key ido-completion-map '[S-SunOpen] 'dired-jump-from-ido))
+
+;; By default there's some overlap (file-name-history regexp-search-ring search-ring), so remove it. savehist mode dynamically grows savehist-minibuffer-history-variables, so overlaps must be dynamically removed from desktop-globals-to-save:
+(defun deduplicate-savehist-desktop-vars ()
+  (mapc (lambda (x) (setq desktop-globals-to-save
+			  (delete x desktop-globals-to-save)))
+	(intersection savehist-minibuffer-history-variables desktop-globals-to-save)))
+
+(defun wg-quiet-update ()
+  ;; wg doesn't allow any operations, not even update, while minibuffer active
+  (unless (or (active-minibuffer-window) (null wg-list))
+    (let ((wg-quiet t)) (wg-update-all-workgroups))))
+
+;;Can't add auto-save hook unconditionally since desktop file might not get loaded, and can't test that condition while init file is loading because desktop-dirname isn't set until desktop-read runs, which is only in after-init-hook. Could just unconditionally add to auto-save-hook and rely on my fix for bug# FIXME: what bug number for my report on May 26, 2013 for autosave? ** to remove it on first failure, but cleaner to do it this way. XXX Or could unconditionally add a hook that removes itself if desktop-dirname is nil.
+(defun conditionally-add-desktop-autosave ()
+  (when desktop-dirname
+    (add-hook 'auto-save-hook (lambda () (desktop-save desktop-dirname)))
+    ;; Don't add again if another desktop loaded. FIXME: but I want to remove the old one, and add new one, since new one might be in different dir. Why does desktop mode separate desktop base name and dirname in the first place?
+    (remove-hook 'desktop-after-read-hook 'conditionally-add-desktop-autosave)))
+
+(with-no-warnings ; Byte compiler incorrectly claims that «i» is unused.
+  ;; ...and it whines here despite the with-no-warnings. Yay, Emacs.
+(defun nicizer-bind-wg-switch-keys ()
+  (eval
+   (let ((forms))
+     `(progn
+	,@(dotimes (i 10 forms)
+	    (push `(defun ,(intern (format "wg-switch-silently-%d" i)) ()
+		     (interactive)
+		     (let ((wg-quiet t))
+		       (,(intern (format "wg-switch-to-index-%d" i)))))
+		  forms)
+	    (push `(global-set-key ',(read (format "[M-f%d]"
+						     ;; f1-f9 for 1-9; f10 for 0
+						     (if (= i 0) 10 i)))
+				   ',(intern (format "wg-switch-silently-%d" i)))
+		  forms))))))
+)
+
+(defcustom message-outbox-directory
+  (file-name-as-directory (expand-file-name "outbox" message-directory))
+  "Directory where messages queued for sending are stored."
+  :type 'directory
+  :group 'message)
+
+(defcustom message-queued-drafts-directory
+  (file-name-as-directory (expand-file-name "queued-drafts" message-directory))
+  "Directory where original drafts of messages queued for sending are stored."
+  :type 'directory
+  :group 'message)
+
+;; Relies on mv-rename from http://code.activestate.com/recipes/578116-move-files-with-rename-if-required/
+(defun queue-message-to-outbox ()
+  (let ((filename (expand-file-name "out.mail" message-outbox-directory)))
+    (delete-mail-header-separator)
+    (write-file filename)
+    (shell-command (concat "mv-rename " filename " " message-outbox-directory))))
+
+(defun discard-draft ()
+  ;; TODO: just do delete-file, after confirming that won't break anything here
+  (basic-save-buffer)
+  (shell-command (concat "mv-rename " (buffer-file-name) " " message-queued-drafts-directory)))
+
+(defun delete-mail-header-separator ()
+  "Delete `mail-header-separator'.
+This function copied from top of `message-send-mail-partially' in Emacs's message.el."
+  (goto-char (point-min))
+  (re-search-forward
+   (concat "^" (regexp-quote mail-header-separator) "\n"))
+  (replace-match "\n"))
+
 
 ;;; Fix whitespace-mode brokenness
 
@@ -206,14 +311,14 @@ This is unlike Emacs's `whitespace-mode' variable, which isn't set by turning on
 (make-variable-buffer-local 'whitespace-mode-actually-on)
 (put 'whitespace-mode-actually-on 'permanent-local t) ; Necessary for accuracy because whitespace mode remains on in a buffer after changing major mode if global-whitespace-mode is on. FIXME: or does whitespace-turn-on get called again after the change of major mode, so it isn't actually necessary to have this permanent-local?
 
-(defadvice whitespace-turn-on (after record-whitespace-mode-actually-on)
+(defun whitespace-turn-on--record-actually-on ()
   (setq whitespace-mode-actually-on t))
 
-(defadvice whitespace-turn-off (after record-whitespace-mode-actually-off)
+(defun whitespace-turn-off--record-actually-off ()
   (setq whitespace-mode-actually-on nil))
 
-(ad-activate 'whitespace-turn-on)
-(ad-activate 'whitespace-turn-off)
+(advice-add 'whitespace-turn-on :after #'whitespace-turn-on--record-actually-on)
+(advice-add 'whitespace-turn-off :after #'whitespace-turn-off--record-actually-off)
 
 
 ;;; Monospace mode
@@ -300,6 +405,101 @@ Uses web-browser-style keybindings."
   (text-browse-minor-mode (if text-browse-minor-mode 0 t)))
 
 
+;;; Simple manual stopwatch.
+
+(defvar nicizer-stopwatch-mark nil)
+
+(defun nicizer-reset-stopwatch ()
+  (interactive)
+  (setq nicizer-stopwatch-mark (current-time)))
+
+(defun nicizer-read-stopwatch ()
+"Echo time since stopwatch was reset."
+  (interactive)
+  (message "%s" (float-time (time-since nicizer-stopwatch-mark))))
+
+
+;;; Typing speed recorder, with adjustment for corrected typos
+;;; Duration printed is time spent typing. Divide by duty cycle to get total length of session.
+
+(defvar current-typing-burst-start-time nil)
+(defvar current-typing-burst-end-time nil)
+(defvar current-typing-burst-char-count nil)
+(defvar current-typing-burst-typo-count nil)
+(defvar typing-burst-history nil
+  "List of typing bursts.
+ Each element is (start-time char-count typo-count duration).")
+
+(defun init-typing-burst (currtime)
+  (setq current-typing-burst-start-time currtime)
+  (setq current-typing-burst-end-time currtime)
+  (setq current-typing-burst-char-count 1)
+  (setq current-typing-burst-typo-count 0))
+
+(defun dump-typing-burst-history ()
+  (if typing-burst-history
+      (let (start-time ; typing-burst-history is in reverse chronological order
+	    (end-time (+ (float-time (caar typing-burst-history)) (cadddr (car typing-burst-history))))
+	    (char-count 0) (typo-count 0) (duration 0))
+	(mapc (lambda (x)
+		  (setq start-time (car x))
+		  (incf char-count (cadr x))
+		  (incf typo-count (caddr x))
+		  (incf duration (cadddr x)))
+		typing-burst-history)
+	(append-to-file (format "%s, %d words, %d typos, %dh %.2fm, %.2fWPM, accuracy %.2f%%, duty %.2f%%\n"
+				(format-time-string "%Y %b %d %H:%M:%S%Z" start-time)
+				(/ (- char-count typo-count) 6); 6 chars/word in English, including spaces (official standard is 5 chars/word, including spaces, but the standard is a lie; the truth is closer to 5 chars/word, excluding spaces). Typo adjustment is approximate, since a sequence of delete-backward-char and backward-delete-word commands can delete both typoed chars and nearby correct chars. Total chars that remain inserted into buffer by self-insert-command can be less than (- char-count typo-count), both because backward-delete-word can delete multiple chars but counts as only one typo, and because no deletion commands count as typo corrections unless done within a typing burst.
+				typo-count
+				(floor duration 3600) (/ (mod duration 3600) 60)
+				(* 10 (/ (- char-count typo-count) duration)) ; 60 seconds/minute, divided by 6 chars/word
+				(* 100 (- 1 (/ (float typo-count) char-count)))
+				(* 100 (/ duration (- end-time (float-time start-time)))))
+			nil (concat user-emacs-directory "typing-session-stats"))
+	(setq typing-burst-history nil))))
+
+;; TODO: use a 1-second Emacs timer to push typing-burst-history and call init-typing-burst, and a 1-hour timer to call dump-typing-burst-history, and have typing-burst-timer and typing-burst-typo-counter just unconditionally increment their variables. But then, I can differentiate the timings for self-insert (1 second) and typo correction (5 seconds).
+(defun typing-burst-timer ()
+  (let ((currtime (current-time)))
+    (if (not current-typing-burst-start-time) (init-typing-burst currtime)
+      (let ((time-diff (float-time (time-subtract currtime current-typing-burst-end-time))))
+	(if (> time-diff 3600) (dump-typing-burst-history))
+	(if (< time-diff 1.0) ; Burst still in progress (not dropped below 10wpm)
+	    (progn
+	      (setq current-typing-burst-end-time currtime)
+	      (incf current-typing-burst-char-count))
+	  (if (> current-typing-burst-char-count 1) ; Burst length of one can't be timed
+	      (push (list current-typing-burst-start-time current-typing-burst-char-count
+			  current-typing-burst-typo-count
+			  (float-time (time-subtract current-typing-burst-end-time current-typing-burst-start-time)))
+		    typing-burst-history))
+	  (init-typing-burst currtime))))))
+
+(defun typing-burst-typo-counter ()
+  ;; Successive backward deletions count as only one typo.
+  (if (and (eq last-command 'self-insert-command) (memq this-command
+		 '(delete-backward-char backward-delete-char-untabify backward-delete-word)))
+      (let ((currtime (current-time)))
+	(when (< (float-time (time-subtract currtime current-typing-burst-end-time)) 2)
+	    (setq current-typing-burst-end-time currtime)
+	    (incf current-typing-burst-typo-count)))))
+
+
+;;; Structured-text mode
+;;; TODO: implement this
+
+(defvar stext-mode-syntax-table
+  (let ((st (make-syntax-table)))
+    ;;FIXME: the ⌜§‡⌝ pair should go here, rather than standard-case-table, but set-case-syntax-delims modifies standard-case-table even if another table is passed, and I don't know why.
+    st))
+
+(defun stext-indent-line () (indent-relative)) ;;FIXME: indent according to structure, like Lisp mode does.
+
+(define-derived-mode stext-mode text-mode "Stext"
+  "Major mode for section-structured text."
+  (set (make-local-variable 'indent-line-function) 'stext-indent-line))
+
+
 ;;; Miscellaneous commands
 
 (defun zoom-standard ()
@@ -345,6 +545,54 @@ Uses web-browser-style keybindings."
   (silently (with-no-warnings
 	      (end-of-buffer arg))))
 
+(defun switch-to-new-buffer (&optional basename)
+  "Create and switch to a new buffer with a name based on BASENAME, or ⌜untitled⌝ if none given.
+Enable `undo-tree-mode' and `whitespace-mode' in the new buffer, and enable auto-save."
+  (interactive)
+  (let ((nb (generate-new-buffer (or basename "untitled"))))
+    (letrec ((gross-hack (lambda () (switch-to-buffer nb)
+			   (remove-hook 'post-command-hook gross-hack))))
+      (with-current-buffer nb
+	(turn-on-undo-tree-mode)
+	(font-lock-mode)
+	(whitespace-turn-on)
+	;; Don't lose buffers in crashes
+	(mkdir (concat user-emacs-directory "untitled") t)
+	(setq buffer-file-name
+	      (format (concat user-emacs-directory "untitled/%s")
+		      (buffer-name)))
+	(auto-save-mode))
+      ;; If running from ido, can't just switch to buffer, because aborting recursive edit overrides buffer selection on exit, and I can't just exit-recursive-edit since that'll just accept ido's default and cause ido to override my buffer switch, so I have to switch after aborting. This foobarness is all because I'm putting this function in ido-completion-map so that I can press SunOpen twice to get a new buffer (once is to run ido-switch-buffer), and ido is just so beautifully elegant in the way it handles that.
+      (if (= (minibuffer-depth) 0) (switch-to-buffer nb)
+	(add-hook 'post-command-hook gross-hack)
+	;; FIXME: messages "Quit", and I don't think I can avoid it without changing the C code.
+	(abort-recursive-edit)))))
+
+;;ido-dired isn't suitable for this, since it doesn't jump to line of current file.
+(defun dired-jump-from-ido ()
+  "`dired-jump', after working around ido awkwardness.
+See comments in code for `switch-to-new-buffer' for details."
+  (interactive)
+  (letrec ((gross-hack-dired-ido
+	    (lambda () (dired-jump)
+	      (remove-hook 'post-command-hook gross-hack-dired-ido))))
+    (add-hook 'post-command-hook gross-hack-dired-ido)
+    (abort-recursive-edit)))
+
+(defun conlock ()
+  "Lock the console using vlock."
+  (interactive)
+  (shell-command "vlock -ans"))
+
+(defun copy-last-message ()
+  "Copy to kill ring the last message printed to echo area."
+  (interactive)
+  (with-current-buffer "*Messages*"
+    (goto-char (point-max))
+    (line-select-minor-mode)
+    (not-presumptuous-copy-region (mark) (point))
+    (deactivate-mark)))
+
 
 ;;; Init
 
@@ -373,11 +621,26 @@ Many others."
      (,(kbd "M-)") paredit-splice-sexp)
 
      ;; Miscellaneous
+     ([S-help] eldoc-mode)
+     ([M-help] insert-char)
+     ([M-S-help] describe-char)
+     ([S-menu] previous-layout)
      ([S-XF86Forward] monospace-mode)
+     ([M-XF86Forward] calc)
      ([M-menu] text-browse-minor-mode-toggle)
+     ([M-XF86Save] enable-read-write)
      ([M-XF86Back] zoom-standard)
      ([M-S-XF86Back] zoom-out)
      ([M-S-XF86Forward] zoom-in)
+     ([C-SunFront] er/expand-region) ; selsexp key is C-SunFront
+     ([s-S-SunOpen] wg-switch-to-previous-workgroup)
+     (,(kbd "s-U") wg-switch-to-previous-workgroup)
+     ([C-S-f15] ,ctl-x-map) ; genprfx. FIXME: C-S-F15 C-t does transpose-lines, as expected, but in calc mode it still tries to do transpose-lines (which doesn't work), instead of calc-transpose-lines that C-x C-t is rebound to. Is calc-mode remapping the keychord instead of the function? And where in the Emacs source code C-x is bound to ctl-x-map?
+     ([C-M-f15] mode-specific-command-prefix) ; mdeprfx. FIXME: Emacs's bindings.el does (define-key global-map "\C-c" 'mode-specific-command-prefix), and C-c works, but C-M-f15 doesn't work, at least for winner mode.
+     ([s-f23] conlock)
+     ([M-S-delete] copy-last-message)
+     ([f8] nicizer-reset-stopwatch)
+     ([f9] nicizer-read-stopwatch)
 
      ;; Replace Vimizer and Usablizer bindings to reduce message noise
      ([SunFront] silent-push-mark-command)
@@ -385,13 +648,19 @@ Many others."
      ([M-end] silent-end-of-buffer)))
 
   ;; Better access to the search history ring
-  (ad-activate 'isearch-repeat-forward)
-  (ad-activate 'isearch-repeat-backward)
-  (ad-activate 'isearch-forward-exit-minibuffer)
-  (ad-activate 'isearch-reverse-exit-minibuffer)
+  (advice-add 'isearch-repeat-forward :after
+	      #'isearch-repeat-forward--remove-up-down-ring)
+  (advice-add 'isearch-repeat-backward :after
+	      #'isearch-repeat-backward--remove-up-down-ring)
+  (advice-add 'isearch-forward-exit-minibuffer :before
+	      #'isearch-forward-exit-minibuffer--remove-up-down-ring)
+  (advice-add 'isearch-reverse-exit-minibuffer :before
+	      #'isearch-forward-exit-minibuffer--remove-up-down-ring)
   (add-hook 'isearch-mode-hook 'up-down-ring-isearch)
   ;; To prevent maybe-remove-up-down-ring from being left in post-command-hook
   (add-hook 'isearch-mode-end-hook 'remove-up-down-ring)
+
+  (nicizer-bind-wg-switch-keys)
 
   ;; Add delimiter pairs missing from Emacs
   ;; For electric-pair-mode, show-paren-mode, and sexp-based movement/editing commands
@@ -449,6 +718,20 @@ Many others."
   (put 'paredit-doublequote 'delete-selection t)
   (put 'paredit-newline 'delete-selection t)
 
+  (eldoc-add-command
+   'paredit-backward-delete
+   'paredit-backward-delete-word
+   'paredit-close-round
+   ;; I'm including below only my commands not covered by the completions included by the call to eldoc-add-command-completions at the end of eldoc.el:
+   'uf-backward-sexp
+   'uf-forward-sexp
+   'not-weird-beginning-of-defun
+   'not-weird-end-of-defun
+   'out-list
+   'in-list
+   'home-list
+   'end-list)
+
   (add-hook 'message-mode-hook (lambda () (auto-fill-mode 0))) ; FIXME: insert (at front) hook to message-send-mail-function to check for lines longer than 1000 chars, and offer to do hard word wrap before sending. And test this.
 
 ;; Highlight erroneous whitespace
@@ -475,6 +758,159 @@ Many others."
 	  (rotate-mark-ring-hook track-mark-ring-position) ; See Usablizer
 	  (flyspell-mode-hook maybe-flyspell-buffer))))
 
+;;;###autoload
+(defun nicizer-init-niche ()
+  "Settings that you probably don't want."
+  (remove-hook 'prog-mode-hook 'monospace-mode) ; Remove the sop to the luddites
+  (add-hook 'find-file-hook 'read-only-mode) ; Avoid accidentally modifying stuff
+  (setq debug-on-error t)
+  (setq eval-expression-print-length nil)
+  (setq eval-expression-print-level nil)
+  (setq undo-tree-visualizer-timestamps nil) ; Timestamps are useless since my patch was rejected
+  ;; (setq undo-tree-visualizer-relative-timestamps nil)
+  (setq undo-tree-enable-undo-in-region nil)
+  (setq backward-delete-char-untabify-method nil) ; Emacs's default (untabify) is annoying
+  (setq x-stretch-cursor t) ; When on a tab char, it's best to notice that fact
+  (setq mouse-autoselect-window t)
+  (set-face-attribute 'default nil :height 90) ; Emacs default is 98, which is too big. Smaller increments are:
+  ;; 90, which has monospace char size 7x15 pixels, proportional size 3-11x15 (width 3 for i and j, 11 for W).
+  ;; 83, which has monospace char size 7x14 pixels, proportional size 3-9x15 (width 3 for i and j, 9 for W).
+  ;; 75, which is still readable but too small for comfort.
+  (set-scroll-bar-mode nil) ; TODO: have (thin) scroll bars, but overlay them with the gutters, rather than put them parallel to the gutters. This avoids wasting space. Use just a lightweight-shaded block for the scroll bar's slider to avoid obscuring the markings shown in the gutters.
+  ;; (add-hook 'emacs-lisp-mode-hook 'turn-on-eldoc-mode)
+  ;; (add-hook 'lisp-interaction-mode-hook 'turn-on-eldoc-mode)
+  ;; (add-hook 'ielm-mode-hook 'turn-on-eldoc-mode)
+  (set-case-syntax-delims ?§ ?‡ (standard-case-table))
+  (mkdir (concat user-emacs-directory "backupfiles") t)
+  (setq backup-directory-alist
+	`(("." . ,(concat user-emacs-directory "backupfiles"))))
+  (setq backup-by-copying t)
+  (setq auto-save-file-name-transforms
+	`((".*/\\(.*\\)" ,(concat user-emacs-directory "autosavefiles/\\1") t)))
+  (setq auto-save-include-big-deletions t)
+  (setq auto-save-default t) ; t is currently the Emacs default, but let's make sure
+  (setq ispell-personal-dictionary (concat user-emacs-directory "ispell_personal"))
+  (setq tags-file-name nil)
+  (setq tags-table-list '("/usr/local/src/emacs/TAGS" "/usr/local/src/emacs/TAGS-LISP"))
+
+  (ido-mode t)
+  (add-hook 'ido-setup-hook 'nicizer-ido-keys)
+  (setq ido-default-file-method 'selected-window)
+  (setq ido-default-buffer-method 'selected-window)
+  ;; (setq ido-use-virtual-buffers t) ; Don't like after all; when I close a buffer, I want it off my working list
+  (add-hook 'ido-minibuffer-setup-hook 'ido-disable-line-trucation)
+  ;; Copied from http://www.emacswiki.org/cgi-bin/wiki/InteractivelyDoThings
+  ;; But this is still lame; even for long lists, it uses a tiny area (the minibuffer) and makes me scroll a lot, rather than using the full vertical screen space, or the full screen.
+  ;; Display ido results vertically, rather than horizontally
+  (setq ido-decorations (quote ("\n-> " "" "\n   " "\n   ..." "[" "]" " [No match]" " [Matched]" " [Not readable]" " [Too big]" " [Confirm]")))
+
+  (eval-and-compile (require 'bookmark+)) ; TODO: Review
+  (setq bookmark-default-file (concat user-emacs-directory "bookmarks"))
+  (setq bookmark-save-flag nil)
+
+  ;; TODO: Switch to workgroups2
+  (setq wg-prefix-key '[C-f15])
+  (workgroups-mode 1) ; TODO: workgroups2 eliminates need to use ⌜1⌝ arg to enable (rather than toggle)?
+  (setq wg-morph-on nil)
+  (setq wg-query-for-save-on-emacs-exit nil) ; Since I save workgroups as part of desktop instead.
+
+  (pushnew 'kill-ring desktop-globals-to-save)
+  (pushnew 'wg-list desktop-globals-to-save) ; TODO: review after upgrade to workgroups2
+  (pushnew 'typing-burst-history desktop-globals-to-save)
+  (pushnew 'word-wrap desktop-locals-to-save)
+  ;; desktop-create-buffer in Desktop.el takes care to "Never override file system if the file really is read-only marked", but as a consequence it fails to override my enable-read-only in find-file-hook. Adding buffer-read-only to desktop-locals-to-save works around this, because desktop-create-buffer unconditionally restores it.
+  (pushnew 'buffer-read-only desktop-locals-to-save)
+
+  ;; FIXME: buffer-face-mode and text-scale-mode don't restore properly, apparently because the buffer-local vars are restored only after the modes are enabled
+  ;; (pushnew 'buffer-face-mode-face desktop-locals-to-save)
+  ;; (pushnew 'buffer-face-mode-lighter desktop-locals-to-save)
+  ;; (pushnew 'text-scale-mode-amount desktop-locals-to-save)
+  ;; (pushnew 'text-scale-mode-lighter desktop-locals-to-save)
+
+  ;; TODO: review these after upgrade to workgroups2
+  (add-hook 'desktop-save-hook 'deduplicate-savehist-desktop-vars)
+  (add-hook 'desktop-save-hook 'wg-quiet-update)
+  (add-hook 'desktop-after-read-hook 'conditionally-add-desktop-autosave)
+
+  ;; Outgoing message handling
+  (pushnew '(utf-8 . 8bit) mm-body-charset-encoding-alist) ; Make Emacs stop mangling my messages.
+  (setq message-kill-buffer-on-exit t)
+  (setq message-directory "~/mail/") ; Default is "~/Mail/" (uppercase), which I don't want.
+  (setq message-auto-save-directory ; Re-set because of Emacs bug #19068.
+	(file-name-as-directory (expand-file-name "drafts" message-directory)))
+  (setq message-outbox-directory ; Just to make sure, considering bug #19068.
+	(file-name-as-directory (expand-file-name "outbox" message-directory)))
+  (setq message-queued-drafts-directory ; Just to make sure, considering bug #19068.
+	(file-name-as-directory (expand-file-name "queued-drafts" message-directory)))
+  (mkdir message-auto-save-directory t)
+  (mkdir message-outbox-directory t)
+  (mkdir message-queued-drafts-directory t)
+  (setq message-send-mail-function 'queue-message-to-outbox)
+  (add-hook 'message-sent-hook 'discard-draft))
+
+;;;###autoload
+(defun nicizer-init-junk () ; TODO: process these
+  (global-set-key-list
+   '(([C-M-find] highlight-symbol-next)
+     ([C-M-S-find] highlight-symbol-prev)
+     ([M-S-find] highlight-symbol-at-point)
+					; (global-set-key "\t" 'hippie-expand)
+					; (global-set-key "\t" 'dabbrev-expand) ; TODO: I want a completion window, like minibuffer-complete gives.
+     ("\t" completion-at-point) ; TODO: gets rid of completion window if I use motion command, but not if I press escape. Get rid of it in latter case also.
+     ([C-find] isearch-repeat-forward-modeless) ; Remember I mapped nxtmtch key to C-find due to lack of USB keycodes.
+     ([C-S-find] isearch-repeat-backward-modeless)
+     ;; For debugging: (global-set-key '[f5] 'do-auto-save)
+     ([M-S-prior] scroll-back-one-or-arg-ow)
+     ([M-S-next] scroll-forward-one-or-arg-ow)
+     ([M-S-menu] (lambda () (interactive) (message "Layout switcher not implemented.")))
+     ([S-f10] (lambda () (interactive) ; X on Debian 6 for some reason unloads my custom map after suspending and resuming, so this is to enable convenient reloading.
+		(shell-command "xmodmap ~/.xmodmap-reset")
+		(shell-command "xmodmap ~/.xmodmap-latin")
+		(setq current-layout 'latin)
+		(message "Reloaded ~/.xmodmap-reset")))
+     ([f7] unicode-code-to-char)
+     ([f4] (lambda () (interactive) (benchmark-ms nil '(previous-line)))) ; Debugging
+     ([f7] sleepsome) ; Debugging
+     ([backtab] TODO-CMPLSUB) ;Emacs stupidly names shift-tab "backtab", as if there's no possible other sensible use of shift-tab than backtab.
+     ([M-left] UNUSED)
+     ([M-right] UNUSED)
+     ([M-S-left] UNUSED)
+     ([M-S-XF86Save] UNUSED)
+     ([s-f21] UNUSED)
+     ([f7] UNUSED))))
+
+;;;###autoload
+(defun nicizer-init-stateful ()
+  "Initialize recording of Emacs state other than buffer contents."
+  (setq savehist-autosave-interval 30)
+  (setq desktop-base-file-name "desktop")
+  (setq desktop-base-lock-name "desktop.lock")
+  (if (featurep 'bookmark+) (setq bookmark-save-flag 1))
+  (savehist-mode)
+  (desktop-save-mode)
+  (desktop-auto-save-disable) ; Disable the new feature in 24.4, since I already (conditionally) add desktop-save to auto-save-hook. The new 24.4 feature saves only when window config changes, but I also want saving when anything else changes (mark ring, kill ring, etc), and the new feature adds a new idle timer not synchronized with auto-save (of buffers) so the disk chatter is more scattered rather than consolidated. TODO: fix the new feature, then use it, and remove my custom adding of desktop-save to auto-save-hook.
+  (setq desktop-restore-frames nil) ; I already save and restore workgroups, so this new feature is superfluous, and using it would mislead me, because by restoring the windows of the workgroup that was active when Emacs closed, this feature makes it appear that a workgroup has been selected upon startup even though none actually has been, which means any changes I make to the window configuration will be lost as soon as I switch to any workgroup.
+
+  ;; Record command usage:
+  (eval-and-compile (require 'keyfreq))
+  (setq keyfreq-file (concat user-emacs-directory "keyfreq.data"))
+  (keyfreq-mode)
+  (keyfreq-autosave-mode)
+  (setq keyfreq-autosave-timeout 30)
+
+  (setq ido-save-directory-list-file (concat user-emacs-directory "ido.last"))
+
+  (add-hook 'post-self-insert-hook 'typing-burst-timer)
+  (add-hook 'post-command-hook 'typing-burst-typo-counter)
+  (add-hook 'kill-emacs-hook 'dump-typing-burst-history)
+
+  (eval-and-compile (require 'ecomplete))
+  (setq ecomplete-database-file (concat user-emacs-directory "ecompleterc"))
+  (setq message-mail-alias-type 'ecomplete)
+
+  (pushnew 'closed-buffer-history desktop-globals-to-save)
+  (pushnew 'closed-buffer-history-max-saved-items desktop-globals-to-save)
+  (pushnew 'closed-buffer-history-max-full-items desktop-globals-to-save))
 
 (provide 'nicizer)
 

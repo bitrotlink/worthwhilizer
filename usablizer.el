@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.1.4
+;; Version: 0.2.0
 ;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.2"))
 ;; Keywords: convenience
 
@@ -71,18 +71,33 @@
 ;;
 ;; 5. Register maintenance.
 ;; Emacs lets your registers become stale. Usablizer provides register-swap-back, which solves this problem.
+;;
+;; 6. A closed-buffer tracker.
+;; Tracks your history of closed buffers and enables reopening them. Restores major mode, minor modes, point, mark, mark ring, and other buffer-local variables. Currently only implemented for file-visiting buffers.
 
 
 ;;; Code:
 
 (require 'misc) ; For forward-to-word
 (require 'delsel) ; For minibuffer-keyboard-quit
+(require 'desktop) ; Used by Usablizer's closed-buffer tracker
 (require 'undo-tree) ; Emacs isn't usable without it
-(require 'vimizer) ; For global-set-key-list and vimizer-bind-keys
+(eval-and-compile (require 'vimizer)) ; For global-set-key-list, vimizer-bind-keys, and the «silently» macro
 (eval-when-compile (require 'cl))
 
 (defalias 'isearch-truncate-or-abort 'isearch-abort) ; See isearch-really-abort
 
+;; Copied from desktop.el:
+;; Just to silence the byte compiler.
+;; Dynamically bound in `desktop-read'.
+(defvar desktop-first-buffer)
+(defvar desktop-buffer-ok-count)
+(defvar desktop-buffer-fail-count)
+
+;; And to make the closed-buffer tracker not fail:
+;; (No idea why the (require 'desktop) above doesn't cover these.)
+(defvar desktop-buffer-locals)
+(defvar desktop-buffer-major-mode)
 
 ;;; Utilities
 
@@ -95,6 +110,19 @@
 	       (equal (caddr elt) buffer-file-name))
       (setcdr elt (copy-marker (cadddr elt)))
       (add-hook 'kill-buffer-hook 'register-swap-out nil t))))
+
+;; point-to-register adds register swap outs, but it isn't used when restoring desktop, so add them by adding this function to desktop-delay-hook
+(defun add-register-swap-outs ()
+  (mapc (lambda (buf)
+	  (catch 'done
+	    ;;3 lines derived from register-swap-out in register.el
+	    (dolist (elem register-alist)
+	      (when (and (markerp (cdr elem))
+			 (eq (marker-buffer (cdr elem)) buf))
+		(with-current-buffer buf
+		  (add-hook 'kill-buffer-hook 'register-swap-out nil t))
+		(throw 'done nil))))) ; I don't remember where I got this idea from
+	(buffer-list)))
 
 ;; Make proper error message for sexp-based movement commands
 (defun sexp-error-message (arg nominal-direction)
@@ -795,10 +823,130 @@ If N is negative, don't delete newlines."
 ;; 4 not needed here, since already hardcoded in simple.el
 
 
+;;; Closed-buffer tracker. Derived from:
+;;; http://stackoverflow.com/questions/2227401/how-to-get-a-list-of-last-closed-files-in-emacs
+
+(defvar closed-buffer-history nil
+  "Reverse chronological list of closed buffers.
+This list stores filenames and/or full buffer states as stored by `desktop-save-mode', including point, mark, and various other buffer local variables.
+The list size is limited by `closed-buffer-history-max-saved-items' and `closed-buffer-history-max-full-items'.
+When a buffer already in the list is closed again, it's moved to the head of the list.")
+
+(defvar closed-buffer-history-max-saved-items 1000
+  "Max items to save on `closed-buffer-history' list.
+Use -1 for unlimited, or zero to disable tracking closed files.
+If disabled after having been enabled, `closed-buffer-history' will retain the list from when it was enabled, even though no new items will be added to it. To clear the list, set it to nil.
+See also `closed-buffer-history-max-full-items'.")
+
+(defvar closed-buffer-history-max-full-items 100
+  "Max full items to save on `closed-buffer-history' list.
+Use -1 for unlimited, or zero to disable tracking of full items. If this limit is less than `closed-buffer-history-max-saved-items', then non-full items will be stored for the difference. If this limit is greater, then `closed-buffer-history-max-saved-items' is the controlling limit. When new items are added to `closed-buffer-history', full items which exceed this limit are converted to non-full items.
+ A full item is a buffer state, including `buffer-file-name', `point', `mark', `mark-ring', and various other buffer local variables as configured for `desktop-save-mode', but excluding the buffer contents, which are stored only in the named file. A non-full item is just a file name.")
+
+;; Derived from assq-delete-all in subr.el
+(defun assoc-delete-all (key alist)
+  "Delete from ALIST all elements whose car is `equal' to KEY.
+Return the modified alist.
+Elements of ALIST that are not conses are ignored."
+  (while (and (consp (car alist))
+	      (equal (car (car alist)) key))
+    (setq alist (cdr alist)))
+  (let ((tail alist) tail-cdr)
+    (while (setq tail-cdr (cdr tail))
+      (if (and (consp (car tail-cdr))
+	       (equal (car (car tail-cdr)) key))
+	  (setcdr tail (cdr tail-cdr))
+	(setq tail tail-cdr))))
+  alist)
+
+(defun untrack-closed-buffer (name)
+  ;; Could be just name, or info list; delete in either case.
+  (setq closed-buffer-history
+	(delete name
+		(assoc-delete-all name closed-buffer-history))))
+
+(defun track-closed-buffer ()
+  (when (and buffer-file-name (not (= closed-buffer-history-max-saved-items 0)))
+    ;; Remove from not-head of list
+    (untrack-closed-buffer buffer-file-name)
+    ;; Add to head of list
+    (pushnew (if (desktop-save-buffer-p buffer-file-name (buffer-name) major-mode)
+		     (cdr (save-current-buffer
+			    (desktop-buffer-info (current-buffer))))
+		   buffer-file-name)
+		 closed-buffer-history)
+    ;; Truncate excess elements
+    (let* ((max-full closed-buffer-history-max-full-items)
+	   (max-saved closed-buffer-history-max-saved-items)
+	   (truncatees (nthcdr max-saved closed-buffer-history))
+	   demotees)
+      (and (> max-saved 0) truncatees (setcdr truncatees nil))
+      (unless (< max-full 0)
+	(setq demotees (nthcdr max-full closed-buffer-history))
+	;; Demote buffer info lists to filenames.
+	(letrec ((demote (lambda (x) (when (and (consp x) (consp (car x)))
+				       (setcar x (caar x)) (funcall demote (cdr x))))))
+	  (funcall demote demotees))))))
+
+
+(defun reopen-buffer (name &optional remove-missing select)
+  "Open file, and restore buffer state if recorded in `closed-buffer-history'.
+Return buffer for the opened file, or nil if not listed in `closed-buffer-history'.
+
+If unable to open file, then remove from `closed-buffer-history' if confirmed
+interactively or REMOVE-MISSING is non-nil, or signal error if it is
+nil and reopen-buffer was not called interactively.
+
+If called interactively, or SELECT is non-nil, then switch to the buffer."
+  (interactive
+   (list (ido-completing-read "Last closed: "
+			      (mapcar (lambda (x) (if (consp x) (car x) x))
+				      closed-buffer-history)
+			      nil t) nil t))
+  (let* ((bufinfo (assoc name closed-buffer-history))
+	 (bufinfo (or bufinfo (if (memq name closed-buffer-history) '(nil nil nil nil nil nil nil nil)))))
+    (unless bufinfo (error "Internal error in reopen-buffer while finding %s" name))
+    ;;Load from info list, using base filename as new buffer name.
+    ;; Avoid globally setting unneeded variables intended internally for desktop-read.
+    ;; Argh, can't use «let», because I have lexical-binding for this file, and there's
+    ;; no «dynamic-let», so I have to set them globally.
+    (setq desktop-buffer-ok-count 0)
+    (setq desktop-buffer-fail-count 0)
+    (setq desktop-first-buffer nil)
+    (let ((buf (silently ; Silence desktop-restore-file-buffer if file can't be found
+		(apply 'desktop-create-buffer (string-to-number desktop-file-version)
+		       name (file-name-nondirectory name) (cddr bufinfo)))))
+      ;; And now get rid of them.
+      (makunbound 'desktop-buffer-ok-count)
+      (makunbound 'desktop-buffer-fail-count)
+      (makunbound 'desktop-first-buffer)
+      (if buf (progn
+		(untrack-closed-buffer name)
+		(with-current-buffer buf (run-hooks 'desktop-delay-hook))
+		(setq desktop-delay-hook nil)
+		(when select
+		  ;;3 lines copied from desktop-restore-file-buffer in desktop.el
+		  (condition-case nil
+		      (switch-to-buffer buf)
+		    (error (pop-to-buffer buf))))
+		buf)
+	(when (or remove-missing
+		  (and
+		   (called-interactively-p 'any)
+		   (y-or-n-p (format
+			      "Failed to open file %s; remove from closed-buffer-history? "
+			      name))))
+	  (untrack-closed-buffer name))
+	(unless (or remove-missing (called-interactively-p 'any))
+	  (error "Failed to open file %s" name))))))
+
+
 ;;; Init
 
-;; This is an essential usability issue, so I'm putting it at top level, not in a function
+;; These are essential usability issues, so I'm putting them at top level, not in a function
 (add-hook 'find-file-hook 'register-swap-back)
+(add-hook 'desktop-delay-hook 'add-register-swap-outs t) ; Can't use desktop-after-read-hook for register swap outs since buffers might be lazily restored. Since I'm using desktop-delay-hook, must append, so that the set-marker calls that are added to desktop-delay-hook when desktop-create-buffer runs are run first.
+(add-hook 'kill-buffer-hook 'track-closed-buffer)
 
 ;;;###autoload
 (defun usablizer-bind-keys ()
@@ -806,12 +954,25 @@ If N is negative, don't delete newlines."
   (interactive)
   (unless line-move-visual
     (user-error "usablizer-bind-keys is not designed for your weirdo config"))
+
+  (mapc
+   #'global-unset-key
+   '(
+     ;; Get rid of annoying new global keybindings in Emacs 24.3
+     [XF86Back] ; previous-buffer
+     [XF86Forward] ; next-buffer
+
+     ;; Better bindings for these later in this function
+     "\M-\d" ; backward-kill-word
+     [C-backspace] ; backward-kill-word
+     [menu] ; execute-extended-command
+     [redo] ; repeat-complex-command
+     [f4] ; kmacro-start-macro-or-insert-counter
+     [C-up] ; Emacs's weird paragraph movement commands
+     [C-down]))
+
   (vimizer-bind-keys) ; Emacs isn't usable without them
   (setq shift-select-mode nil) ; The Windintosh junk
-
-  ;; Get rid of annoying new global keybindings in Emacs 24.3
-  (global-unset-key [XF86Back]) ; By default bound to previous-buffer
-  (global-unset-key [XF86Forward]) ; next-buffer
 
   (global-set-key-list
    '(
@@ -871,7 +1032,7 @@ If N is negative, don't delete newlines."
 
      ;; File, buffer, and window management
      ([SunOpen] switch-to-buffer) ; ido-mode remaps to ido-switch-buffer
-     ([S-SunOpen] ido-find-file)
+     ([S-SunOpen] find-file)
      ([M-SunOpen] ibuffer)
      ([M-S-SunOpen] bury-buffer)
      ([XF86Close] not-hijacked-kill-buffer)
@@ -911,6 +1072,9 @@ If N is negative, don't delete newlines."
      ([C-S-menu] eval-region-or-last-sexp)
      ([C-M-menu] eval-expression)
      ([C-M-S-menu] shell-command)
+     ;; http://www.freebsddiary.org/APC/usb_hid_usages.php calls code 0x79 "Again". Emacs binds it by default to repeat-complex-command, to which it also binds another key it calls "again". So why does it call 0x79 "redo"? XXX: check bindings.
+     ([M-redo] kmacro-start-macro-or-insert-counter)
+     ([S-redo] kmacro-end-or-call-macro)
      ;; Disable undo key if undo-tree mode is disabled, to avoid accidentally using Emacs's standard undo without realizing it
      ([undo] undo-tree-mode-not-enabled)
      ([S-undo] undo-tree-mode-not-enabled)
@@ -972,6 +1136,117 @@ If N is negative, don't delete newlines."
   ;; But this seems to work just as well:
   (fix-minibuffer-maps)
   (fix-isearch-map))
+
+
+;;; Copied function from Emacs 24.4, with patch needed by reopen-buffer applied
+;;; TODO: Delete this after my patch is accepted
+
+(defun desktop-create-buffer
+    (file-version
+     buffer-filename
+     buffer-name
+     buffer-majormode
+     buffer-minormodes
+     buffer-point
+     buffer-mark
+     buffer-readonly
+     buffer-misc
+     &optional
+     buffer-locals
+     buffer-mark-ring
+     &rest _unsupported)
+
+  (let ((desktop-file-version	    file-version)
+	(desktop-buffer-file-name   buffer-filename)
+	(desktop-buffer-name	    buffer-name)
+	(desktop-buffer-major-mode  buffer-majormode)
+	(desktop-buffer-minor-modes buffer-minormodes)
+	(desktop-buffer-point	    buffer-point)
+	(desktop-buffer-mark	    buffer-mark)
+	(desktop-buffer-read-only   buffer-readonly)
+	(desktop-buffer-misc	    buffer-misc)
+	(desktop-buffer-locals	    buffer-locals))
+    ;; To make desktop files with relative file names possible, we cannot
+    ;; allow `default-directory' to change. Therefore we save current buffer.
+    (save-current-buffer
+      ;; Give major mode module a chance to add a handler.
+      (desktop-load-file desktop-buffer-major-mode)
+      (let ((buffer-list (buffer-list))
+	    (result
+	     (condition-case-unless-debug err
+		 (funcall (or (cdr (assq desktop-buffer-major-mode
+					 desktop-buffer-mode-handlers))
+			      'desktop-restore-file-buffer)
+			  desktop-buffer-file-name
+			  desktop-buffer-name
+			  desktop-buffer-misc)
+	       (error
+		(message "Desktop: Can't load buffer %s: %s"
+			 desktop-buffer-name
+			 (error-message-string err))
+		(when desktop-missing-file-warning (sit-for 1))
+		nil))))
+	(if (bufferp result)
+	    (setq desktop-buffer-ok-count (1+ desktop-buffer-ok-count))
+	  (setq desktop-buffer-fail-count (1+ desktop-buffer-fail-count))
+	  (setq result nil))
+	;; Restore buffer list order with new buffer at end. Don't change
+	;; the order for old desktop files (old desktop module behavior).
+	(unless (< desktop-file-version 206)
+	  (dolist (buf buffer-list)
+            (and (buffer-live-p buf)
+                 (bury-buffer buf)))
+	  (when result (bury-buffer result)))
+	(when result
+	  (unless (or desktop-first-buffer (< desktop-file-version 206))
+	    (setq desktop-first-buffer result))
+	  (set-buffer result)
+	  (unless (equal (buffer-name) desktop-buffer-name)
+	    (rename-buffer desktop-buffer-name t))
+	  ;; minor modes
+	  (cond ((equal '(t) desktop-buffer-minor-modes) ; backwards compatible
+		 (auto-fill-mode 1))
+		((equal '(nil) desktop-buffer-minor-modes) ; backwards compatible
+		 (auto-fill-mode 0))
+		(t
+		 (dolist (minor-mode desktop-buffer-minor-modes)
+		   ;; Give minor mode module a chance to add a handler.
+		   (desktop-load-file minor-mode)
+		   (let ((handler (cdr (assq minor-mode desktop-minor-mode-handlers))))
+		     (if handler
+			 (funcall handler desktop-buffer-locals)
+		       (when (functionp minor-mode)
+			 (funcall minor-mode 1)))))))
+	  ;; Even though point and mark are non-nil when written by
+	  ;; `desktop-save', they may be modified by handlers wanting to set
+	  ;; point or mark themselves.
+	  (when desktop-buffer-point
+	    (goto-char
+	     (condition-case err
+		 ;; Evaluate point.  Thus point can be something like
+		 ;; '(search-forward ...
+		 (eval desktop-buffer-point)
+	       (error (message "%s" (error-message-string err)) 1))))
+	  (when desktop-buffer-mark
+            (if (consp desktop-buffer-mark)
+		(set-mark (car desktop-buffer-mark)
+			  (not (car (cdr desktop-buffer-mark))))
+	      (set-mark desktop-buffer-mark t)))
+	  ;; Never override file system if the file really is read-only marked.
+	  (when desktop-buffer-read-only (setq buffer-read-only desktop-buffer-read-only))
+	  (dolist (this desktop-buffer-locals)
+	    (if (consp this)
+		;; An entry of this form `(symbol . value)'.
+		(progn
+		  (make-local-variable (car this))
+		  (set (car this) (cdr this)))
+	      ;; An entry of the form `symbol'.
+	      (make-local-variable this)
+	      (makunbound this)))
+	  (unless (< desktop-file-version 207) ;; Don't misinterpret any old custom args
+	    (setq mark-ring
+		  (mapcar (lambda (p) (set-marker (make-marker) p)) buffer-mark-ring))))
+	result))))
 
 
 (provide 'usablizer)
