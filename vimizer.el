@@ -232,8 +232,8 @@ This is the equivalent of `mouse-yank-primary', but suitable for keyboard bindin
 
 ;; Doesn't work, since defvar is not a function:
 ;; (mapc #'defvar cctm-vars)
+
 ;; Doesn't work either:
-;; (eval-when-compile (require 'cl))
 ;; (dolist (i cctm-vars)
 ;;   (defvar i nil))
 
@@ -321,7 +321,7 @@ Optional ARG is passed to the next command."
 (defun cctm-exit ()
   (save-selected-window ; In case top-level command selected a different window
     (if cctm-window-of-anchor (select-window cctm-window-of-anchor t))
-    (unless mark-active (setq cursor-type ; Last command might have set mark active, and activating mark sets cursor type to bar, so don't interfere with that.
+    (unless mark-active (setq cursor-type ; Last command might have set mark active, and activating mark sets cursor type to bar in Nicizer, so don't interfere with that.
 			      (unless (bound-and-true-p text-browse-minor-mode) t))))
   (blink-cursor-mode
    (case cctm-original-blink-cursor-status

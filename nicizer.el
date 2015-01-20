@@ -1,5 +1,5 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.2
+;; Version: 0.2.1
 ;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.2") (usablizer "0.2"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -67,6 +67,14 @@
 ;; ...but it whines about them anyway. Yay, Emacs.
 
 ;;; Utilities
+
+(defmacro mv-to-head (elt list)
+  "Move ELT to head of LIST. Add if not already present.
+Delete all occurrences of ELT from LIST, then push ELT to head of LIST."
+  (let ((oelt (gensym)))
+    `(let ((,oelt ,elt)) ; For the push, in case elt is a function of list
+       (setq ,list (delq ,oelt ,list))
+       (push ,oelt ,list))))
 
 (defun strikethrough-compatible-font-p ()
   "Return t if the default font is known to render U0336 as strikethrough composed with preceding character."
@@ -270,6 +278,43 @@ Show nothing when they're on, to avoid cluttering the mode line."
 		  forms))))))
 )
 
+(defvar nicizer-kbd-layouts '(latin)
+  "Layouts selectable by `nicizer-kbd-switch-layout'. Current layout is head of list.")
+
+;; X on Debian 6 and 7 for some reason unloads my custom map after laptop suspend and resume, so this is to enable convenient reloading.
+(defun nicizer-kbd-layout-reset ()
+  "Reset keyboard layout."
+  (interactive)
+  (shell-command "xmodmap ~/.xmodmap-reset")
+  (shell-command "xmodmap ~/.xmodmap-latin")
+  (mv-to-head 'latin nicizer-kbd-layouts)
+  (message "Layout reset"))
+
+(defun nicizer-kbd-previous-layout ()
+  "Switch to previous layout in `nicizer-kbd-layouts'."
+  (interactive)
+  (unless (cadr nicizer-kbd-layouts)
+    (user-error "No other keyboard layout available"))
+  (nicizer-kbd-switch-layout (cadr nicizer-kbd-layouts)))
+
+(defun nicizer-kbd-switch-layout (layout)
+  "Switch keyboard layout, and move it to head of `nicizer-kbd-layouts'.
+The layout must be in the file named ⌜~/.xmodmap-φ⌝, where φ is the name of the layout."
+  (interactive
+   (list (intern (completing-read
+		  "Keyboard layout: "
+		  (mapcar #'symbol-name nicizer-kbd-layouts)
+		  nil 'confirm
+		  (if (cadr nicizer-kbd-layouts)
+		      (symbol-name (cadr nicizer-kbd-layouts)))))))
+  (let ((filename (concat "~/.xmodmap-"
+			  (symbol-name layout))))
+    (unless (file-readable-p filename)
+      (user-error "Can't read file %s" filename))
+    (shell-command (concat "xmodmap " filename))
+    (message "Loaded %s" filename))
+  (mv-to-head layout nicizer-kbd-layouts))
+
 (defcustom message-outbox-directory
   (file-name-as-directory (expand-file-name "outbox" message-directory))
   "Directory where messages queued for sending are stored."
@@ -301,6 +346,26 @@ This function copied from top of `message-send-mail-partially' in Emacs's messag
   (re-search-forward
    (concat "^" (regexp-quote mail-header-separator) "\n"))
   (replace-match "\n"))
+
+(defun nicizer-generate-random-message-id ()
+  (concat "<"
+	  (substring
+	   (remove ?/
+		   (remove ?+
+			   (shell-command-to-string "head -c 48 /dev/urandom | base64")))
+	   0 43)
+	  "@local>"))
+
+(defun nicizer-message-make-message-id ()
+  "This function replaces the standard `message-make-message-id' in Emacs's message.el, which whines about localhost hostname."
+  (nicizer-generate-random-message-id))
+
+(defun nicizer-message-make-date-UTC (&optional now)
+  "Make a valid date header.
+If NOW, use that time instead.
+This function copied from and identical to `message-make-date' in Emacs's message.el, except it tells `format-time-string' to use UTC."
+  (let ((system-time-locale "C"))
+    (format-time-string "%a, %d %b %Y %T %z" now t)))
 
 
 ;;; Fix whitespace-mode brokenness
@@ -585,7 +650,7 @@ See comments in code for `switch-to-new-buffer' for details."
   (shell-command "vlock -ans"))
 
 (defun copy-last-message ()
-  "Copy to kill ring the last message printed to echo area."
+  "Copy to `clip-ring' the last message printed to echo area."
   (interactive)
   (with-current-buffer "*Messages*"
     (goto-char (point-max))
@@ -597,22 +662,17 @@ See comments in code for `switch-to-new-buffer' for details."
 ;;; Init
 
 ;;;###autoload
-(defun nicizer-init ()
-  "Hijack the user's settings and keybindings.
-Add hooks to set bar cursor when mark is active, and block cursor when mark is inactive.
-Show whitespace, set variable-pitch font, unclutter the mode line.
-Many others."
+(defun nicizer-bind-keys ()
+  "Hijack the user's keybindings."
   (interactive)
-  ;; usablizer-bind-keys omitted here because everybody would whine about it
-  (vimizer-bind-keys)
   (global-set-key-list
    `(([M-S-f13] paredit-mode)
 
      ;; Some paredit commands useful even when not in paredit mode
-     ([f14] paredit-backward-slurp-sexp)
      ([f13] paredit-forward-slurp-sexp)
-     ([S-f14] paredit-backward-barf-sexp)
      ([S-f13] paredit-forward-barf-sexp)
+     ([f14] paredit-backward-slurp-sexp)
+     ([S-f14] paredit-backward-barf-sexp)
      ([M-f14] paredit-split-sexp)
      ([M-S-f14] paredit-join-sexps)
      ([M-f13] paredit-raise-sexp)
@@ -621,18 +681,17 @@ Many others."
      (,(kbd "M-)") paredit-splice-sexp)
 
      ;; Miscellaneous
-     ([S-help] eldoc-mode)
-     ([M-help] insert-char)
-     ([M-S-help] describe-char)
-     ([S-menu] previous-layout)
+     ([M-menu] text-browse-minor-mode-toggle)
+     ([S-menu] nicizer-kbd-previous-layout)
+     ([M-S-menu] nicizer-kbd-switch-layout)
+     ([S-f10] nicizer-kbd-layout-reset)
+     ([M-XF86Save] enable-read-write)
      ([S-XF86Forward] monospace-mode)
      ([M-XF86Forward] calc)
-     ([M-menu] text-browse-minor-mode-toggle)
-     ([M-XF86Save] enable-read-write)
+     ([M-S-XF86Forward] zoom-in)
      ([M-XF86Back] zoom-standard)
      ([M-S-XF86Back] zoom-out)
-     ([M-S-XF86Forward] zoom-in)
-     ([C-SunFront] er/expand-region) ; selsexp key is C-SunFront
+     ([C-SunFront] er/expand-region) ; selsexp key is C-SunFront ; TODO: replace this?
      ([s-S-SunOpen] wg-switch-to-previous-workgroup)
      (,(kbd "s-U") wg-switch-to-previous-workgroup)
      ([C-S-f15] ,ctl-x-map) ; genprfx. FIXME: C-S-F15 C-t does transpose-lines, as expected, but in calc mode it still tries to do transpose-lines (which doesn't work), instead of calc-transpose-lines that C-x C-t is rebound to. Is calc-mode remapping the keychord instead of the function? And where in the Emacs source code C-x is bound to ctl-x-map?
@@ -647,6 +706,8 @@ Many others."
      ([M-home] silent-beginning-of-buffer)
      ([M-end] silent-end-of-buffer)))
 
+  (nicizer-bind-wg-switch-keys)
+
   ;; Better access to the search history ring
   (advice-add 'isearch-repeat-forward :after
 	      #'isearch-repeat-forward--remove-up-down-ring)
@@ -658,9 +719,15 @@ Many others."
 	      #'isearch-forward-exit-minibuffer--remove-up-down-ring)
   (add-hook 'isearch-mode-hook 'up-down-ring-isearch)
   ;; To prevent maybe-remove-up-down-ring from being left in post-command-hook
-  (add-hook 'isearch-mode-end-hook 'remove-up-down-ring)
+  (add-hook 'isearch-mode-end-hook 'remove-up-down-ring))
 
-  (nicizer-bind-wg-switch-keys)
+;;;###autoload
+(defun nicizer-init ()
+  "Hijack the user's settings.
+Add hooks to set bar cursor when mark is active, and block cursor when mark is inactive.
+Show whitespace, set variable-pitch font, unclutter the mode line.
+Many others."
+  (interactive)
 
   ;; Add delimiter pairs missing from Emacs
   ;; For electric-pair-mode, show-paren-mode, and sexp-based movement/editing commands
@@ -782,6 +849,7 @@ Many others."
   ;; (add-hook 'ielm-mode-hook 'turn-on-eldoc-mode)
   (set-case-syntax-delims ?§ ?‡ (standard-case-table))
   (mkdir (concat user-emacs-directory "backupfiles") t)
+  (mkdir (concat user-emacs-directory "autosavefiles") t)
   (setq backup-directory-alist
 	`(("." . ,(concat user-emacs-directory "backupfiles"))))
   (setq backup-by-copying t)
@@ -827,7 +895,7 @@ Many others."
   ;; (pushnew 'text-scale-mode-amount desktop-locals-to-save)
   ;; (pushnew 'text-scale-mode-lighter desktop-locals-to-save)
 
-  ;; TODO: review these after upgrade to workgroups2
+  ;; TODO: review these after upgrade to workgroups2, and move to nicizer-init or -stateful.
   (add-hook 'desktop-save-hook 'deduplicate-savehist-desktop-vars)
   (add-hook 'desktop-save-hook 'wg-quiet-update)
   (add-hook 'desktop-after-read-hook 'conditionally-add-desktop-autosave)
@@ -846,38 +914,9 @@ Many others."
   (mkdir message-outbox-directory t)
   (mkdir message-queued-drafts-directory t)
   (setq message-send-mail-function 'queue-message-to-outbox)
-  (add-hook 'message-sent-hook 'discard-draft))
-
-;;;###autoload
-(defun nicizer-init-junk () ; TODO: process these
-  (global-set-key-list
-   '(([C-M-find] highlight-symbol-next)
-     ([C-M-S-find] highlight-symbol-prev)
-     ([M-S-find] highlight-symbol-at-point)
-					; (global-set-key "\t" 'hippie-expand)
-					; (global-set-key "\t" 'dabbrev-expand) ; TODO: I want a completion window, like minibuffer-complete gives.
-     ("\t" completion-at-point) ; TODO: gets rid of completion window if I use motion command, but not if I press escape. Get rid of it in latter case also.
-     ([C-find] isearch-repeat-forward-modeless) ; Remember I mapped nxtmtch key to C-find due to lack of USB keycodes.
-     ([C-S-find] isearch-repeat-backward-modeless)
-     ;; For debugging: (global-set-key '[f5] 'do-auto-save)
-     ([M-S-prior] scroll-back-one-or-arg-ow)
-     ([M-S-next] scroll-forward-one-or-arg-ow)
-     ([M-S-menu] (lambda () (interactive) (message "Layout switcher not implemented.")))
-     ([S-f10] (lambda () (interactive) ; X on Debian 6 for some reason unloads my custom map after suspending and resuming, so this is to enable convenient reloading.
-		(shell-command "xmodmap ~/.xmodmap-reset")
-		(shell-command "xmodmap ~/.xmodmap-latin")
-		(setq current-layout 'latin)
-		(message "Reloaded ~/.xmodmap-reset")))
-     ([f7] unicode-code-to-char)
-     ([f4] (lambda () (interactive) (benchmark-ms nil '(previous-line)))) ; Debugging
-     ([f7] sleepsome) ; Debugging
-     ([backtab] TODO-CMPLSUB) ;Emacs stupidly names shift-tab "backtab", as if there's no possible other sensible use of shift-tab than backtab.
-     ([M-left] UNUSED)
-     ([M-right] UNUSED)
-     ([M-S-left] UNUSED)
-     ([M-S-XF86Save] UNUSED)
-     ([s-f21] UNUSED)
-     ([f7] UNUSED))))
+  (add-hook 'message-sent-hook 'discard-draft)
+  (fset 'message-make-message-id 'nicizer-message-make-message-id)
+  (fset 'message-make-date 'nicizer-message-make-date-UTC))
 
 ;;;###autoload
 (defun nicizer-init-stateful ()
@@ -911,6 +950,17 @@ Many others."
   (pushnew 'closed-buffer-history desktop-globals-to-save)
   (pushnew 'closed-buffer-history-max-saved-items desktop-globals-to-save)
   (pushnew 'closed-buffer-history-max-full-items desktop-globals-to-save))
+
+;;;###autoload
+(defun nicizer-init-all ()
+  "Initialize all keybindings and features of Vimizer, Usablizer, and Nicizer."
+  (interactive)
+  (usablizer-bind-keys) ; Also calls vimizer-bind-keys
+  (nicizer-bind-keys)
+  (nicizer-init)
+  (nicizer-init-niche)
+  (nicizer-init-stateful))
+
 
 (provide 'nicizer)
 

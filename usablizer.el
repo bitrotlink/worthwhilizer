@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.2.0
+;; Version: 0.2.1
 ;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.2"))
 ;; Keywords: convenience
 
@@ -156,7 +156,7 @@
 	(word-wrap 'word)
 	(t 'char)))
 
-(defun fix-minibuffer-maps ()
+(defun usablizer-fix-minibuffer-maps ()
   ;; Derived from delsel.el
   (mapc (lambda (x)
 	  (define-key x [remap keyboard-quit] 'minibuffer-keyboard-quit))
@@ -169,14 +169,14 @@
   (define-key minibuffer-local-isearch-map [find] 'isearch-forward-exit-minibuffer)
   (define-key minibuffer-local-isearch-map [S-find] 'isearch-reverse-exit-minibuffer))
 
-(defun fix-isearch-map ()
+(defun usablizer-fix-isearch-map ()
   ;; Derived from http://xahlee.org/emacs/reclaim_keybindings.html
   (mapc (lambda (x) (define-key isearch-mode-map (car x) (cadr x)))
 	'(([find] isearch-repeat-forward)
 	  ([S-find] isearch-repeat-backward)
 	  ([XF86Paste] isearch-yank-pop)
 	  ([remap keyboard-quit] isearch-really-abort)
-	  ;; ([remap partial-escape] isearch-truncate-or-abort) ; XXX: Doesn't work, I don't know why, and don't care anymore. Hardcoding to S-escape solves the problem.
+	  ;; ([remap partial-escape] isearch-truncate-or-abort) ; FIXME: Doesn't work, I don't know why, and don't care anymore. Hardcoding to S-escape solves the problem.
 	  ([S-escape] isearch-truncate-or-abort))))
 
 ;; Change a setting only if the user hasn't already customized it
@@ -843,7 +843,7 @@ See also `closed-buffer-history-max-full-items'.")
 Use -1 for unlimited, or zero to disable tracking of full items. If this limit is less than `closed-buffer-history-max-saved-items', then non-full items will be stored for the difference. If this limit is greater, then `closed-buffer-history-max-saved-items' is the controlling limit. When new items are added to `closed-buffer-history', full items which exceed this limit are converted to non-full items.
  A full item is a buffer state, including `buffer-file-name', `point', `mark', `mark-ring', and various other buffer local variables as configured for `desktop-save-mode', but excluding the buffer contents, which are stored only in the named file. A non-full item is just a file name.")
 
-;; Derived from assq-delete-all in subr.el
+;; Copied from assq-delete-all in subr.el, but «eq» replaced by «equal».
 (defun assoc-delete-all (key alist)
   "Delete from ALIST all elements whose car is `equal' to KEY.
 Return the modified alist.
@@ -972,7 +972,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      [C-down]))
 
   (vimizer-bind-keys) ; Emacs isn't usable without them
-  (setq shift-select-mode nil) ; The Windintosh junk
+  (setq shift-select-mode nil) ; Get rid of the Windintosh junk
 
   (global-set-key-list
    '(
@@ -1016,6 +1016,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-backspace] backward-delete-word)
      ([S-delete] just-one-space-or-eol)
      ([M-delete] remove-all-text-properties)
+     ("\t" completion-at-point) ; TODO: this gets rid of completion window if I use motion command, but not if I press escape. Get rid of it in latter case also. Other options would be hippie-expand or dabbrev-expand, but they don't use a full-window completion buffer like minibuffer-complete does.
      ([f23] indent-for-tab-command)
      ([S-f23] insert-tab-command)
      ([C-f23] indent-sexp-or-region)
@@ -1057,6 +1058,9 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([s-S-undo] winner-redo)
 
      ;; Miscellaneous
+     ([S-help] eldoc-mode)
+     ([M-help] insert-char)
+     ([M-S-help] describe-char)
      ([C-M-S-f15] count-words)
      ([M-S-right] set-line-wrap)
      ([f18] universal-argument)
@@ -1131,15 +1135,15 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
   (global-set-key [S-find] 'isearch-backward)
 
   ;; XXX: Manual section «(emacs) Init Rebinding» says I'm supposed to do this:
-  ;; (add-hook 'minibuffer-setup-hook 'fix-minibuffer-maps)
-  ;; (add-hook 'isearch-mode-hook 'fix-isearch-map)
+  ;; (add-hook 'minibuffer-setup-hook 'usablizer-fix-minibuffer-maps)
+  ;; (add-hook 'isearch-mode-hook 'usablizer-fix-isearch-map)
   ;; But this seems to work just as well:
-  (fix-minibuffer-maps)
-  (fix-isearch-map))
+  (usablizer-fix-minibuffer-maps)
+  (usablizer-fix-isearch-map))
 
 
 ;;; Copied function from Emacs 24.4, with patch needed by reopen-buffer applied
-;;; TODO: Delete this after my patch is accepted
+;;; TODO: Delete this after my patch is accepted, and add (emacs "25") to Package-Requires
 
 (defun desktop-create-buffer
     (file-version
