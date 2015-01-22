@@ -1,5 +1,5 @@
 ;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
-;; Version: 0.2.3
+;; Version: 0.2.4
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
 
@@ -121,18 +121,19 @@ If region is active, then operate on all lines which are at least partially incl
   (mapc (lambda (x) (global-set-key (car x) (cadr x)))
 	list))
 
+(defvar cursor-suppressors nil
+  "List of modes that are currently suppressing the cursor.")
+(make-variable-buffer-local 'cursor-suppressors)
+
 (defun unsuppress-cursor (suppressor)
-  (let ((newlist (delq suppressor (get 'dynamic-cursor-mode 'suppressors))))
-    (put 'dynamic-cursor-mode 'suppressors newlist)
-    (unless newlist
-      (kill-local-variable 'dynamic-cursor-mode)
-      (setq cursor-type (if (and mark-active dynamic-cursor-mode) 'bar t)))))
+  (unless (setq cursor-suppressors (delq suppressor cursor-suppressors))
+    (kill-local-variable 'dynamic-cursor-mode)
+    (setq cursor-type (if (and mark-active dynamic-cursor-mode) 'bar t))))
 
 (defun suppress-cursor (suppressor)
-  (put 'dynamic-cursor-mode 'suppressors
-       (cons suppressor (get 'dynamic-cursor-mode 'suppressors)))
   (setq-local dynamic-cursor-mode nil)
-  (setq cursor-type nil))
+  (setq cursor-type nil)
+  (pushnew suppressor cursor-suppressors))
 
 
 ;;; Modeless editing commands

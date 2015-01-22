@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.2.2
-;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.3") (usablizer "0.2.2"))
+;; Version: 0.2.3
+;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.4") (usablizer "0.2.3"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)

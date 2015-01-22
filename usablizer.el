@@ -1,6 +1,6 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.2.2
-;; Package-Requires: ((emacs "25") (undo-tree "0.6.5") (vimizer "0.2.3"))
+;; Version: 0.2.3
+;; Package-Requires: ((emacs "25") (undo-tree "0.6.5") (vimizer "0.2.4"))
 ;; Keywords: convenience
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
