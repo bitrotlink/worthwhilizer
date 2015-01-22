@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.2.1
-;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.2") (usablizer "0.2"))
+;; Version: 0.2.2
+;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.3") (usablizer "0.2.2"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -220,18 +220,6 @@ Show nothing when they're on, to avoid cluttering the mode line."
 ;; Need this because flyspell-mode runs its hook both when turning on and when turning off
 (defun maybe-flyspell-buffer ()
   (if flyspell-mode (flyspell-buffer)))
-
-(defvar text-browse-minor-mode) ; Defined below; silence compiler warning here
-;; Use block cursor when region is inactive, except in text-browse mode
-;; Add this to deactivate-mark-hook
-(defun nicizer-deactivate-mark ()
-  (setq cursor-type (if text-browse-minor-mode nil t)))
-
-;; Use bar cursor when region is active, except in line-select mode
-;; Add this to activate-mark-hook
-(defun nicizer-activate-mark ()
-  ;; line-select is in Vimizer
-  (setq cursor-type (if (bound-and-true-p line-select-minor-mode) nil 'bar)))
 
 (defun ido-disable-line-trucation () (set (make-local-variable 'truncate-lines) nil))
 
@@ -456,13 +444,12 @@ Uses web-browser-style keybindings."
 	(show-paren-mode 0)
 	(setq tbmm-original-line-wrap (get-line-wrap))
 	(set-line-wrap 'word)
-	(unless mark-active (setq cursor-type nil)))
+	(suppress-cursor 'text-browse-minor-mode))
     (progn
       (read-only-mode (or tbmm-original-read-only 0)) ; Emacs's demented API
       (show-paren-mode (or tbmm-original-show-paren 0))
       (set-line-wrap tbmm-original-line-wrap)
-      (unless (bound-and-true-p line-select-minor-mode)
-	(setq cursor-type (if mark-active 'bar t))))))
+      (unsuppress-cursor 'text-browse-minor-mode))))
 
 (defun text-browse-minor-mode-toggle ()
   "Toggle `text-browse-minor-mode' without superfluous message'." ; Mode is already indicated on the mode line
@@ -818,12 +805,9 @@ Many others."
 	    eshell-mode-hook ; Ditto
 	    prog-mode-hook))) ; Sop to the luddites
 
-  (mapc (lambda (x) (add-hook (car x) (cadr x)))
-	'((buffer-face-mode-hook set-monospace-mode-lighter)
-	  (deactivate-mark-hook nicizer-deactivate-mark)
-	  (activate-mark-hook nicizer-activate-mark)
-	  (rotate-mark-ring-hook track-mark-ring-position) ; See Usablizer
-	  (flyspell-mode-hook maybe-flyspell-buffer))))
+  (add-hook 'buffer-face-mode-hook 'set-monospace-mode-lighter)
+  (add-hook 'rotate-mark-ring-hook 'track-mark-ring-position) ; See Usablizer
+  (add-hook 'flyspell-mode-hook 'maybe-flyspell-buffer))
 
 ;;;###autoload
 (defun nicizer-init-niche ()

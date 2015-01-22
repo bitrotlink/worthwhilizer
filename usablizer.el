@@ -1,6 +1,6 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.2.1
-;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.2"))
+;; Version: 0.2.2
+;; Package-Requires: ((emacs "25") (undo-tree "0.6.5") (vimizer "0.2.3"))
 ;; Keywords: convenience
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -77,6 +77,8 @@
 
 
 ;;; Code:
+
+;;; TODO: Ensure my patch for desktop-create-buffer is accepted in time for Emacs 25.1.
 
 (require 'misc) ; For forward-to-word
 (require 'delsel) ; For minibuffer-keyboard-quit
@@ -1140,117 +1142,6 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
   ;; But this seems to work just as well:
   (usablizer-fix-minibuffer-maps)
   (usablizer-fix-isearch-map))
-
-
-;;; Copied function from Emacs 24.4, with patch needed by reopen-buffer applied
-;;; TODO: Delete this after my patch is accepted, and add (emacs "25") to Package-Requires
-
-(defun desktop-create-buffer
-    (file-version
-     buffer-filename
-     buffer-name
-     buffer-majormode
-     buffer-minormodes
-     buffer-point
-     buffer-mark
-     buffer-readonly
-     buffer-misc
-     &optional
-     buffer-locals
-     buffer-mark-ring
-     &rest _unsupported)
-
-  (let ((desktop-file-version	    file-version)
-	(desktop-buffer-file-name   buffer-filename)
-	(desktop-buffer-name	    buffer-name)
-	(desktop-buffer-major-mode  buffer-majormode)
-	(desktop-buffer-minor-modes buffer-minormodes)
-	(desktop-buffer-point	    buffer-point)
-	(desktop-buffer-mark	    buffer-mark)
-	(desktop-buffer-read-only   buffer-readonly)
-	(desktop-buffer-misc	    buffer-misc)
-	(desktop-buffer-locals	    buffer-locals))
-    ;; To make desktop files with relative file names possible, we cannot
-    ;; allow `default-directory' to change. Therefore we save current buffer.
-    (save-current-buffer
-      ;; Give major mode module a chance to add a handler.
-      (desktop-load-file desktop-buffer-major-mode)
-      (let ((buffer-list (buffer-list))
-	    (result
-	     (condition-case-unless-debug err
-		 (funcall (or (cdr (assq desktop-buffer-major-mode
-					 desktop-buffer-mode-handlers))
-			      'desktop-restore-file-buffer)
-			  desktop-buffer-file-name
-			  desktop-buffer-name
-			  desktop-buffer-misc)
-	       (error
-		(message "Desktop: Can't load buffer %s: %s"
-			 desktop-buffer-name
-			 (error-message-string err))
-		(when desktop-missing-file-warning (sit-for 1))
-		nil))))
-	(if (bufferp result)
-	    (setq desktop-buffer-ok-count (1+ desktop-buffer-ok-count))
-	  (setq desktop-buffer-fail-count (1+ desktop-buffer-fail-count))
-	  (setq result nil))
-	;; Restore buffer list order with new buffer at end. Don't change
-	;; the order for old desktop files (old desktop module behavior).
-	(unless (< desktop-file-version 206)
-	  (dolist (buf buffer-list)
-            (and (buffer-live-p buf)
-                 (bury-buffer buf)))
-	  (when result (bury-buffer result)))
-	(when result
-	  (unless (or desktop-first-buffer (< desktop-file-version 206))
-	    (setq desktop-first-buffer result))
-	  (set-buffer result)
-	  (unless (equal (buffer-name) desktop-buffer-name)
-	    (rename-buffer desktop-buffer-name t))
-	  ;; minor modes
-	  (cond ((equal '(t) desktop-buffer-minor-modes) ; backwards compatible
-		 (auto-fill-mode 1))
-		((equal '(nil) desktop-buffer-minor-modes) ; backwards compatible
-		 (auto-fill-mode 0))
-		(t
-		 (dolist (minor-mode desktop-buffer-minor-modes)
-		   ;; Give minor mode module a chance to add a handler.
-		   (desktop-load-file minor-mode)
-		   (let ((handler (cdr (assq minor-mode desktop-minor-mode-handlers))))
-		     (if handler
-			 (funcall handler desktop-buffer-locals)
-		       (when (functionp minor-mode)
-			 (funcall minor-mode 1)))))))
-	  ;; Even though point and mark are non-nil when written by
-	  ;; `desktop-save', they may be modified by handlers wanting to set
-	  ;; point or mark themselves.
-	  (when desktop-buffer-point
-	    (goto-char
-	     (condition-case err
-		 ;; Evaluate point.  Thus point can be something like
-		 ;; '(search-forward ...
-		 (eval desktop-buffer-point)
-	       (error (message "%s" (error-message-string err)) 1))))
-	  (when desktop-buffer-mark
-            (if (consp desktop-buffer-mark)
-		(set-mark (car desktop-buffer-mark)
-			  (not (car (cdr desktop-buffer-mark))))
-	      (set-mark desktop-buffer-mark t)))
-	  ;; Never override file system if the file really is read-only marked.
-	  (when desktop-buffer-read-only (setq buffer-read-only desktop-buffer-read-only))
-	  (dolist (this desktop-buffer-locals)
-	    (if (consp this)
-		;; An entry of this form `(symbol . value)'.
-		(progn
-		  (make-local-variable (car this))
-		  (set (car this) (cdr this)))
-	      ;; An entry of the form `symbol'.
-	      (make-local-variable this)
-	      (makunbound this)))
-	  (unless (< desktop-file-version 207) ;; Don't misinterpret any old custom args
-	    (setq mark-ring
-		  (mapcar (lambda (p) (set-marker (make-marker) p)) buffer-mark-ring))))
-	result))))
 
 
 (provide 'usablizer)

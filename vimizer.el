@@ -1,5 +1,5 @@
 ;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
-;; Version: 0.2.2
+;; Version: 0.2.3
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
 
@@ -120,6 +120,19 @@ If region is active, then operate on all lines which are at least partially incl
   "Map `global-set-key' to LIST of keybindings."
   (mapc (lambda (x) (global-set-key (car x) (cadr x)))
 	list))
+
+(defun unsuppress-cursor (suppressor)
+  (let ((newlist (delq suppressor (get 'dynamic-cursor-mode 'suppressors))))
+    (put 'dynamic-cursor-mode 'suppressors newlist)
+    (unless newlist
+      (kill-local-variable 'dynamic-cursor-mode)
+      (setq cursor-type (if (and mark-active dynamic-cursor-mode) 'bar t)))))
+
+(defun suppress-cursor (suppressor)
+  (put 'dynamic-cursor-mode 'suppressors
+       (cons suppressor (get 'dynamic-cursor-mode 'suppressors)))
+  (setq-local dynamic-cursor-mode nil)
+  (setq cursor-type nil))
 
 
 ;;; Modeless editing commands
@@ -258,7 +271,7 @@ Optional ARG is passed to the next command."
     (unless (memq last-command cctm-activators) (push-mark (point) t)) ; Just for the user's convenience
     (setq cctm-cut-mode t)
     (setq cctm-copy-mode nil)
-    (setq cursor-type 'bar)
+    (if dynamic-cursor-mode (setq cursor-type 'bar))
     (cctm-enter-common arg append)))
 
 (defun modal-copy (&optional arg append)
@@ -271,7 +284,7 @@ Optional ARG is passed to the next command."
     (unless (memq last-command cctm-activators) (push-mark (point) t)) ; Just for the user's convenience
     (setq cctm-cut-mode nil)
     (setq cctm-copy-mode t)
-    (setq cursor-type t)
+    (if dynamic-cursor-mode (setq cursor-type t))
     (cctm-enter-common arg append)))
 
 (defun modal-cut-append (arg)
@@ -321,8 +334,8 @@ Optional ARG is passed to the next command."
 (defun cctm-exit ()
   (save-selected-window ; In case top-level command selected a different window
     (if cctm-window-of-anchor (select-window cctm-window-of-anchor t))
-    (unless mark-active (setq cursor-type ; Last command might have set mark active, and activating mark sets cursor type to bar in Nicizer, so don't interfere with that.
-			      (unless (bound-and-true-p text-browse-minor-mode) t))))
+    (if (and dynamic-cursor-mode (not mark-active)) ; Last command might have set mark active, and activating mark sets cursor type to bar in dynamic-cursor-mode, so don't interfere with that.
+	(setq cursor-type t)))
   (blink-cursor-mode
    (case cctm-original-blink-cursor-status
      (0 0)
@@ -374,7 +387,7 @@ Select the current logical line, and select more logical lines when point is mov
 	(remove-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark t)
 	;; FIXME: after Emacs fixes bug #19513, add:
 	;; (kill-local-variable shift-select-mode) ; Nobody else uses it buffer-locally
-	(setq cursor-type (unless (bound-and-true-p text-browse-minor-mode) t))
+	(unsuppress-cursor 'line-select-minor-mode)
 	(setq lsmm-active nil))
     (unless transient-mark-mode
       (user-error "line-select not compatible with your luddite config"))
@@ -418,7 +431,7 @@ Select the current logical line, and select more logical lines when point is mov
 ;; Set the start and end anchors for line-select mode.
 ;; If the mark is active and RESET is nil, extend the current region to include whole logical lines rather than resetting the region to include just the current logical line.
 (defun lsmm-set-anchors (reset)
-  (setq cursor-type nil)
+  (suppress-cursor 'line-select-minor-mode)
   (if (and mark-active (not reset))
       (let* ((old-mark (mark))
 	     (old-point (point))
