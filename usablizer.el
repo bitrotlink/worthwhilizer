@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.2.3
+;; Version: 0.2.4
 ;; Package-Requires: ((emacs "25") (undo-tree "0.6.5") (vimizer "0.2.4"))
 ;; Keywords: convenience
 
@@ -65,6 +65,7 @@
 ;;
 ;; 4. Keybindings (not enabled by default).
 ;; Optimal keybindings for all the features above. You'll hate these, because your keyboard sucks.
+;; Shift-chorded keys put to good uses, and shift-select-mode therefore disabled, even though it's widely popular, since it's a waste of those prime keychords. The traditional Emacs way (set the mark manually, then use normal motion commands to select text) is the right way, and with a non-chorded key (SunFront by default, in Vimizer's case) bound to push-mark-command, takes no extra keystrokes.
 ;; All normal modern software uses the «escape» key to escape the current context (i.e. cancel), but Emacs by default uses it as a sticky modifier key for chorded hotkeys. Usablizer provides the correct binding for «escape».
 ;; To enable all the keybindings, use:
 ;; (usablizer-bind-keys)
@@ -233,12 +234,11 @@ Runs `rotate-mark-ring-hook' afterward."
       (setq mark-ring nil)))
   (run-hooks 'rotate-mark-ring-hook))
 
-(defvar mark-ring-position nil
+(defvar-local mark-ring-position nil
   "Current position of point in the full mark ring (including mark and point).
 Reset at the beginning of each sequence of consecutive calls to `reverse-rotate-mark-ring-and-point' and `rotate-mark-ring-and-point'.
 
 Used only as state for `track-mark-ring-position'.")
-(make-variable-buffer-local 'mark-ring-position)
 
 (defun track-mark-ring-position ()
   "Track navigation through the mark ring.
@@ -355,7 +355,7 @@ Leave point at the end of the defun where it ought to be, rather than at the beg
   "Move to the beginning of the next defun, analogous to `forward-to-sexp'."
   (interactive "p")
   (if (called-interactively-p 'any) (setq this-command 'beginning-of-defun)) ; So it pushes the mark
-  ;; XXX: Would need to do same dance as for forward-to-paragraph and forward-to-sexp, which would mean certainly now I need to put that dance into a macro, instead of repeating the code, but fortunately beginning-of-defun moves to next start of defun rather than to next end of defun.
+  ;; XXX: Would need to do the same mad-cow dance as for forward-to-paragraph and forward-to-sexp, which would mean certainly now I need to put that dance into a macro, instead of repeating the code, but fortunately beginning-of-defun moves to next start of defun rather than to next end of defun.
   (not-weird-beginning-of-defun (- arg)))
 
 (defun not-weird-backward-paragraph (&optional arg)

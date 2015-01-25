@@ -1,5 +1,5 @@
 ;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
-;; Version: 0.2.4
+;; Version: 0.2.5
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
 
@@ -37,8 +37,6 @@
 ;; Additional Vim-inspired features for Emacs are in Usablizer, a companion package for Vimizer.
 ;;
 ;; Unlike other vimization packages for Emacs (and Vim itself), Vimizer and Usablizer don't separate insertion and command modes, because such separation results in accidentally inserting the names of commands into buffers when you try to execute the commands, and accidentally mangling buffers with random edits when you try to insert text. Instead, these packages provide modeless bindings to function keys, so the commands are always available.
-;;
-;; Note that Emacs's shift-select-mode, enabled by default, interferes with Vimizer's line-select mode, and can't be cleanly separated due to bug #19513 in Emacs 24.4. But shift-select is a waste of prime keychords anyway, even though it's widely popular, so you should disable it. The traditional Emacs way (set the mark manually, then use normal motion commands to select text) is the right way, and with a non-chorded key (SunFront by default, in Vimizer's case) bound to push-mark-command, takes no extra keystrokes.
 
 
 ;;; Code:
@@ -121,16 +119,30 @@ If region is active, then operate on all lines which are at least partially incl
   (mapc (lambda (x) (global-set-key (car x) (cadr x)))
 	list))
 
-(defvar cursor-suppressors nil
+(defvar dynamic-cursor-mode nil) ; TODO: remove for Emacs 25.1, if my patch goes in.
+
+(defvar-local cursor-suppressors nil
   "List of modes that are currently suppressing the cursor.")
-(make-variable-buffer-local 'cursor-suppressors)
 
 (defun unsuppress-cursor (suppressor)
-  (unless (setq cursor-suppressors (delq suppressor cursor-suppressors))
-    (kill-local-variable 'dynamic-cursor-mode)
-    (setq cursor-type (if (and mark-active dynamic-cursor-mode) 'bar t))))
+  (let ((cs (setq cursor-suppressors (delq suppressor cursor-suppressors))))
+    (let ((x (or (null cs)
+		 (and (null (cdr cs)) ; There's only one element
+		      (assq 'dcm-orig-local-val cs))))) ; And it's just that cons
+      (when x ; No suppressors remain
+	(if (consp x) ; But there is dcm-orig-local-val
+	    (progn
+	      (setq-local dynamic-cursor-mode (cdr x))
+	      (setq cursor-suppressors nil))
+	  (assert (null cs))
+	  (kill-local-variable 'dynamic-cursor-mode))
+	(setq cursor-type (if (and mark-active dynamic-cursor-mode) 'bar t))))))
 
 (defun suppress-cursor (suppressor)
+  (unless cursor-suppressors
+    (if (assq 'dynamic-cursor-mode (buffer-local-variables))
+	(setq cursor-suppressors
+	      (list (cons 'dcm-orig-local-val dynamic-cursor-mode)))))
   (setq-local dynamic-cursor-mode nil)
   (setq cursor-type nil)
   (pushnew suppressor cursor-suppressors))
@@ -231,7 +243,7 @@ This is the equivalent of `mouse-yank-primary', but suitable for keyboard bindin
   "List of commands that activate cut-copy transient mode.")
 
 (defconst cctm-aborters
-  '(self-insert-command yank not-weird-paste paste-over paste-under undo undo-tree-undo undo-tree-redo eval-region-or-last-sexp)
+  '(self-insert-command backward-delete-char-untabify backward-delete-word delete-forward-char yank not-weird-paste paste-over paste-under undo undo-tree-undo undo-tree-redo eval-region-or-last-sexp)
   "List of commands that can move point, but don't trigger cut or copy when in cut-copy transient mode.")
 
 (defconst cctm-vars
@@ -355,18 +367,11 @@ Optional ARG is passed to the next command."
 ;; sensibly handling exchange-point-and-mark
 ;; sensibly handling mode activation when there's already an active region spanning multiple logical lines
 
-(defvar lsmm-anchor-line-beginning nil)
-(defvar lsmm-anchor-line-end nil)
-(defvar lsmm-point-is-past-anchor nil)
-(defvar lsmm-original-show-paren-status nil)
-(defvar lsmm-active nil) ; When the function line-select-minor-mode runs, the variable of the same name only says whether mode is currently active, not whether mode was already active before the function was called, so lsmm-active is necessary as a separate variable.
-
-(mapc #'make-variable-buffer-local
-      '(lsmm-anchor-line-beginning
-	lsmm-anchor-line-end
-	lsmm-point-is-past-anchor
-	lsmm-original-show-paren-status
-	lsmm-active))
+(defvar-local lsmm-anchor-line-beginning nil)
+(defvar-local lsmm-anchor-line-end nil)
+(defvar-local lsmm-point-is-past-anchor nil)
+(defvar-local lsmm-original-show-paren-status nil)
+(defvar-local lsmm-active nil) ; When the function line-select-minor-mode runs, the variable of the same name only says whether mode is currently active, not whether mode was already active before the function was called, so lsmm-active is necessary as a separate variable.
 
 (defvar line-select-minor-mode-map (make-keymap))
 (mapc (lambda (x) (define-key line-select-minor-mode-map (car x) (cadr x)))
@@ -386,21 +391,17 @@ Select the current logical line, and select more logical lines when point is mov
 	(remove-hook 'post-command-hook 'lsmm-dominate-point-mark t)
 	(remove-hook 'deactivate-mark-hook 'line-select-minor-mode-disable t)
 	(remove-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark t)
-	;; FIXME: after Emacs fixes bug #19513, add:
-	;; (kill-local-variable shift-select-mode) ; Nobody else uses it buffer-locally
+	(kill-local-variable 'shift-select-mode) ; XXX: Nobody else uses it buffer-locally
 	(unsuppress-cursor 'line-select-minor-mode)
 	(setq lsmm-active nil))
     (unless transient-mark-mode
       (user-error "line-select not compatible with your luddite config"))
-    (if shift-select-mode ; FIXME: remove this after Emacs fixes bug #19513
-	(user-error "line-select not compatible with shift-select-mode"))
     (unless lsmm-active ; Line-select mode might already be active, so don't re-init
       (setq lsmm-original-show-paren-status show-paren-mode)
       (add-hook 'post-command-hook 'lsmm-dominate-point-mark nil t)
       (add-hook 'deactivate-mark-hook 'line-select-minor-mode-disable t)
       (add-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark nil t)
-      ;; FIXME: after Emacs fixes bug #19513, add:
-      ;; (if shift-select-mode (setq-local shift-select-mode nil))
+      (if shift-select-mode (setq-local shift-select-mode nil))
       (setq lsmm-active t)
       ;; TODO: draw a thin horizontal black line the full width of the window, below the last selected text line (or above it, if point is before mark), for the same reason that I switch to vertical black line cursor between characters when mark is active and line-select mode isn't active. Then visually, the cursor has become that horizontal line.
       (show-paren-mode 0))

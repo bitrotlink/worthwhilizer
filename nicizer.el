@@ -1,5 +1,5 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.2.3
+;; Version: 0.2.4
 ;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.4") (usablizer "0.2.3"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -358,10 +358,9 @@ This function copied from and identical to `message-make-date' in Emacs's messag
 
 ;;; Fix whitespace-mode brokenness
 
-(defvar whitespace-mode-actually-on nil
+(defvar-local whitespace-mode-actually-on nil
   "t if whitespace mode is on.
 This is unlike Emacs's `whitespace-mode' variable, which isn't set by turning on whitespace mode globally.")
-(make-variable-buffer-local 'whitespace-mode-actually-on)
 (put 'whitespace-mode-actually-on 'permanent-local t) ; Necessary for accuracy because whitespace mode remains on in a buffer after changing major mode if global-whitespace-mode is on. FIXME: or does whitespace-turn-on get called again after the change of major mode, so it isn't actually necessary to have this permanent-local?
 
 (defun whitespace-turn-on--record-actually-on ()
@@ -412,12 +411,9 @@ Besides the choice of face, it is the same as `buffer-face-mode', but quiet."
 ;;; Text-Browse minor mode
 
 ;; Emacs's view-mode implements a bunch of keys which I neither need nor want, and doesn't implement some that I do (e.g. up and down arrows scroll the window rather than move the cursor), and doesn't hide the cursor, or enable word-wrap. Text-Browse minor mode solves this.
-(defvar tbmm-original-read-only nil)
-(defvar tbmm-original-show-paren nil)
-(defvar tbmm-original-line-wrap nil)
-(make-variable-buffer-local 'tbmm-original-read-only)
-(make-variable-buffer-local 'tbmm-original-show-paren)
-(make-variable-buffer-local 'tbmm-original-line-wrap)
+(defvar-local tbmm-original-read-only nil)
+(defvar-local tbmm-original-show-paren nil)
+(defvar-local tbmm-original-line-wrap nil)
 
 (defvar text-browse-minor-mode-map (make-keymap))
 (mapc (lambda (x) (define-key text-browse-minor-mode-map (car x) (cadr x)))
@@ -439,15 +435,15 @@ Uses web-browser-style keybindings."
   (if text-browse-minor-mode
       (progn
 	(setq tbmm-original-read-only buffer-read-only)
-	(read-only-mode)
+	(setq buffer-read-only t)
 	(setq tbmm-original-show-paren show-paren-mode)
 	(show-paren-mode 0)
 	(setq tbmm-original-line-wrap (get-line-wrap))
 	(set-line-wrap 'word)
 	(suppress-cursor 'text-browse-minor-mode))
     (progn
-      (read-only-mode (or tbmm-original-read-only 0)) ; Emacs's demented API
-      (show-paren-mode (or tbmm-original-show-paren 0))
+      (setq buffer-read-only t tbmm-original-read-only)
+      (show-paren-mode (or tbmm-original-show-paren 0)) ; Emacs's demented API
       (set-line-wrap tbmm-original-line-wrap)
       (unsuppress-cursor 'text-browse-minor-mode))))
 
@@ -577,7 +573,7 @@ Uses web-browser-style keybindings."
 (defun enable-read-write ()
   (interactive)
   (text-browse-minor-mode 0)
-  (read-only-mode 0))
+  (setq buffer-read-only nil))
 
 (defun silent-push-mark-command ()
   ;; "Mark set" message is superfluous, since Nicizer sets cursor type with mark activation
@@ -813,7 +809,7 @@ Many others."
 (defun nicizer-init-niche ()
   "Settings that you probably don't want."
   (remove-hook 'prog-mode-hook 'monospace-mode) ; Remove the sop to the luddites
-  (add-hook 'find-file-hook 'read-only-mode) ; Avoid accidentally modifying stuff
+  (add-hook 'find-file-hook '(lambda () (setq buffer-read-only t))) ; Avoid accidentally modifying stuff
   (setq debug-on-error t)
   (setq eval-expression-print-length nil)
   (setq eval-expression-print-level nil)
