@@ -1,5 +1,5 @@
 ;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
-;; Version: 0.2.5
+;; Version: 0.2.6
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
 
@@ -46,20 +46,66 @@
 (eval-and-compile ; Silence the byte compiler warning
   (defvaralias 'clip-ring 'kill-ring)) ; The ring of clippings includes not only ‟killed” (i.e. cut) things, but also copied things, like a clipboard does
 (defalias 'paste-rotate-reverse 'yank-pop) ; ‟pop” implies consumption, which yank-pop doesn't actually do
+(defvar dynamic-cursor-mode nil) ; Implemented in Nicizer
 
 
 ;;; Utilities
 
-;; My simple patches for beginning-of-buffer, end-of-buffer, and yank to take nomsg option, yank to take nopushmark option, and set-mark to take dont-activate option, are cleaner, but the FSF doesn't want them, so this kludge is necessary.
-(defmacro define-nullifier (wrapper victim docstring)
-  "Make a macro named WRAPPER that takes a body and evaluates it with function VICTIM nullified."
+;; My simple patches for beginning-of-buffer, end-of-buffer, and yank to take nomsg option, yank to take nopushmark option, and set-mark to take dont-activate option, are cleaner, but they aren't wanted, so this kludge is necessary.
+(defmacro define-function-suppressor (wrapper victim docstring)
+  "Make a macro named WRAPPER (a symbol), with DOCSTRING, that takes a body and evaluates it with function VICTIM suppressed."
   `(defmacro ,wrapper (&rest body) ,docstring
 	     `(cl-letf (((symbol-function ',',victim) (lambda (&rest _dummy) ())))
 		,@body)))
 
-(define-nullifier silently message "Do BODY without messaging anything.")
-(define-nullifier not-pushily push-mark "Do BODY without pushing the mark.")
-(define-nullifier not-activatingly activate-mark "Do BODY without activating the mark.")
+(define-function-suppressor silently message "Do BODY without messaging anything.")
+(define-function-suppressor not-pushily push-mark "Do BODY without pushing the mark.")
+(define-function-suppressor not-activatingly activate-mark "Do BODY without activating the mark.")
+
+(defmacro define-blmm-suppression-conspiracy (victim &rest body)
+  "Define a list of agents that buffer-locally suppress minor mode VICTIM.
+Also define a pair of functions to add/remove suppressors on the list.
+When the last suppressor is removed, VICTIM is restored to its previous state,
+and optional BODY forms are run. BODY must return a non-nil value."
+  (let* ((victim-name (symbol-name victim))
+	 (blmms-sym (intern (concat victim-name "-suppressors"))))
+    `(progn
+       (defvar-local ,blmms-sym nil
+	 ,(concat "List of agents that are currently suppressing `" victim-name "'."))
+
+       (defun ,(intern (concat "unsuppress-" victim-name)) (suppressor)
+	 ,(concat "Remove SUPPRESSOR from `" victim-name "-suppressors'.
+If no suppressors remain, restore `" victim-name "' to its previous state,
+and return a non-nil value. If any suppressors remain, return nil.")
+	 (let ((blmms (setq ,blmms-sym (delq suppressor ,blmms-sym))))
+	   (let ((x (or (null blmms)
+			(and (null (cdr blmms)) ; There's only one element
+			     (assq 'blmm-orig-val blmms))))) ; And it's just that cons
+	     (when x ; No suppressors remain
+	       (if (consp x) ; But there is blmm-orig-val
+		   (progn
+		     (setq-local ,victim (cdr x))
+		     (setq ,blmms-sym nil))
+		 (assert (null blmms))
+		 (kill-local-variable ',victim))
+	       t ; In case no body follows
+	       ,@body))))
+
+       (defun ,(intern (concat "suppress-" victim-name)) (suppressor)
+	 ,(concat "Add SUPPRESSOR to `" victim-name "-suppressors'.
+Buffer-locally turn off `" victim-name "'.")
+	 (unless ,blmms-sym
+	   (if (assq ',victim (buffer-local-variables))
+	       (setq ,blmms-sym
+		     (list (cons 'blmm-orig-val ,victim)))))
+	 (setq-local ,victim nil)
+	 (pushnew suppressor ,blmms-sym)))))
+
+(define-blmm-suppression-conspiracy shift-select-mode)
+(define-blmm-suppression-conspiracy show-paren-mode)
+(define-blmm-suppression-conspiracy dynamic-cursor-mode
+  (if dynamic-cursor-mode (setq cursor-type (if mark-active 'bar t)) t))
+(define-blmm-suppression-conspiracy cursor-type)
 
 (defun clip-ring-maybe-append-eol ()
   "If no EOL char at end of element at head of clip ring, append one."
@@ -104,12 +150,12 @@ If region is active, then operate on all lines which are at least partially incl
 	    (exchange-point-and-mark)
 	    (unless (bolp) (forward-line))) ; Extend active region to fully include the partially-included last line
 	(forward-line arg)) ; If region not active
-      (let ((landing-column (current-column))
+      (let ((landing-bolp (bolp))
 	    (landing-point (point)))
 	(funcall cut-copy-func start (point) nil append)
 	(if (= start landing-point)
 	    (message "%s empty region" (if is-cut "Cut" "Copied"))) ; Not necessarily at end of buffer; arg could have been 0
-	(if (not (= landing-column 0))
+	(if (not landing-bolp)
 	    (kill-append "\n" nil)))))) ; In case forward-line reached end of buffer and there was no EOL at the end. (I.e. end-of-buffer is serving as implicit EOL.)
 
 (defun setnil (arg) (set arg nil))
@@ -118,34 +164,6 @@ If region is active, then operate on all lines which are at least partially incl
   "Map `global-set-key' to LIST of keybindings."
   (mapc (lambda (x) (global-set-key (car x) (cadr x)))
 	list))
-
-(defvar dynamic-cursor-mode nil) ; TODO: remove for Emacs 25.1, if my patch goes in.
-
-(defvar-local cursor-suppressors nil
-  "List of modes that are currently suppressing the cursor.")
-
-(defun unsuppress-cursor (suppressor)
-  (let ((cs (setq cursor-suppressors (delq suppressor cursor-suppressors))))
-    (let ((x (or (null cs)
-		 (and (null (cdr cs)) ; There's only one element
-		      (assq 'dcm-orig-local-val cs))))) ; And it's just that cons
-      (when x ; No suppressors remain
-	(if (consp x) ; But there is dcm-orig-local-val
-	    (progn
-	      (setq-local dynamic-cursor-mode (cdr x))
-	      (setq cursor-suppressors nil))
-	  (assert (null cs))
-	  (kill-local-variable 'dynamic-cursor-mode))
-	(setq cursor-type (if (and mark-active dynamic-cursor-mode) 'bar t))))))
-
-(defun suppress-cursor (suppressor)
-  (unless cursor-suppressors
-    (if (assq 'dynamic-cursor-mode (buffer-local-variables))
-	(setq cursor-suppressors
-	      (list (cons 'dcm-orig-local-val dynamic-cursor-mode)))))
-  (setq-local dynamic-cursor-mode nil)
-  (setq cursor-type nil)
-  (pushnew suppressor cursor-suppressors))
 
 
 ;;; Modeless editing commands
@@ -370,7 +388,6 @@ Optional ARG is passed to the next command."
 (defvar-local lsmm-anchor-line-beginning nil)
 (defvar-local lsmm-anchor-line-end nil)
 (defvar-local lsmm-point-is-past-anchor nil)
-(defvar-local lsmm-original-show-paren-status nil)
 (defvar-local lsmm-active nil) ; When the function line-select-minor-mode runs, the variable of the same name only says whether mode is currently active, not whether mode was already active before the function was called, so lsmm-active is necessary as a separate variable.
 
 (defvar line-select-minor-mode-map (make-keymap))
@@ -387,24 +404,24 @@ Select the current logical line, and select more logical lines when point is mov
   nil " Line-Select" 'line-select-minor-mode-map
   (if (not line-select-minor-mode)
       (when lsmm-active
-	(if lsmm-original-show-paren-status (show-paren-mode))
 	(remove-hook 'post-command-hook 'lsmm-dominate-point-mark t)
 	(remove-hook 'deactivate-mark-hook 'line-select-minor-mode-disable t)
 	(remove-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark t)
-	(kill-local-variable 'shift-select-mode) ; XXX: Nobody else uses it buffer-locally
-	(unsuppress-cursor 'line-select-minor-mode)
+	(unsuppress-shift-select-mode 'line-select-minor-mode)
+	(unsuppress-show-paren-mode 'line-select-minor-mode)
+	(unsuppress-cursor-type 'line-select-minor-mode)
+	(unsuppress-dynamic-cursor-mode 'line-select-minor-mode)
 	(setq lsmm-active nil))
     (unless transient-mark-mode
       (user-error "line-select not compatible with your luddite config"))
     (unless lsmm-active ; Line-select mode might already be active, so don't re-init
-      (setq lsmm-original-show-paren-status show-paren-mode)
+      (suppress-shift-select-mode 'line-select-minor-mode)
+      (suppress-show-paren-mode 'line-select-minor-mode)
       (add-hook 'post-command-hook 'lsmm-dominate-point-mark nil t)
       (add-hook 'deactivate-mark-hook 'line-select-minor-mode-disable t)
       (add-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark nil t)
-      (if shift-select-mode (setq-local shift-select-mode nil))
-      (setq lsmm-active t)
+      (setq lsmm-active t))
       ;; TODO: draw a thin horizontal black line the full width of the window, below the last selected text line (or above it, if point is before mark), for the same reason that I switch to vertical black line cursor between characters when mark is active and line-select mode isn't active. Then visually, the cursor has become that horizontal line.
-      (show-paren-mode 0))
     (lsmm-set-anchors nil)))
 
 ;;Avoid the problem described in my May 28, 2013 msg to help-gnu-emacs@gnu.org
@@ -433,7 +450,8 @@ Select the current logical line, and select more logical lines when point is mov
 ;; Set the start and end anchors for line-select mode.
 ;; If the mark is active and RESET is nil, extend the current region to include whole logical lines rather than resetting the region to include just the current logical line.
 (defun lsmm-set-anchors (reset)
-  (suppress-cursor 'line-select-minor-mode)
+  (suppress-dynamic-cursor-mode 'line-select-minor-mode)
+  (suppress-cursor-type 'line-select-minor-mode)
   (if (and mark-active (not reset))
       (let* ((old-mark (mark))
 	     (old-point (point))

@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.2.4
-;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.4") (usablizer "0.2.3"))
+;; Version: 0.2.5
+;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.6") (usablizer "0.2.5"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -52,13 +52,13 @@
 (require 'dired-x) ; For dired-jump
 (load "cl-seq") ; For the CL «position» and «intersection»
 (eval-and-compile
-  (require 'cl) ; Load-time too, for «position» and «intersection» aliases
+  (require 'cl) ; Load-time too, for ⌜position⌝ and ⌜intersection⌝ aliases
   (require 'vimizer)) ; For the «silently» macro, and global-set-key-list
 (require 'undo-tree)
 (require 'workgroups)  ; TODO: Switch to workgroups2
-(require 'paredit) ; FIXME: maybe not
-(require 'expand-region) ; FIXME: maybe not
-(require 'highlight-symbol) ; FIXME: probably not
+(require 'paredit) ; TODO: maybe smartparens instead
+(require 'expand-region) ; TODO: maybe something else
+(require 'highlight-symbol) ; TODO: probably not
 (require 'usablizer)
 
 ;; Silence byte compiler
@@ -240,7 +240,7 @@ Show nothing when they're on, to avoid cluttering the mode line."
   (unless (or (active-minibuffer-window) (null wg-list))
     (let ((wg-quiet t)) (wg-update-all-workgroups))))
 
-;;Can't add auto-save hook unconditionally since desktop file might not get loaded, and can't test that condition while init file is loading because desktop-dirname isn't set until desktop-read runs, which is only in after-init-hook. Could just unconditionally add to auto-save-hook and rely on my fix for bug# FIXME: what bug number for my report on May 26, 2013 for autosave? ** to remove it on first failure, but cleaner to do it this way. XXX Or could unconditionally add a hook that removes itself if desktop-dirname is nil.
+;;Can't add auto-save hook unconditionally since desktop file might not get loaded, and can't test that condition while init file is loading because desktop-dirname isn't set until desktop-read runs, which is only in after-init-hook. Could just unconditionally add to auto-save-hook and rely on my fix for bug #14479 to remove it on first failure, but cleaner to do it this way. XXX: Or could unconditionally add a hook that removes itself if desktop-dirname is nil.
 (defun conditionally-add-desktop-autosave ()
   (when desktop-dirname
     (add-hook 'auto-save-hook (lambda () (desktop-save desktop-dirname)))
@@ -412,7 +412,6 @@ Besides the choice of face, it is the same as `buffer-face-mode', but quiet."
 
 ;; Emacs's view-mode implements a bunch of keys which I neither need nor want, and doesn't implement some that I do (e.g. up and down arrows scroll the window rather than move the cursor), and doesn't hide the cursor, or enable word-wrap. Text-Browse minor mode solves this.
 (defvar-local tbmm-original-read-only nil)
-(defvar-local tbmm-original-show-paren nil)
 (defvar-local tbmm-original-line-wrap nil)
 
 (defvar text-browse-minor-mode-map (make-keymap))
@@ -436,21 +435,54 @@ Uses web-browser-style keybindings."
       (progn
 	(setq tbmm-original-read-only buffer-read-only)
 	(setq buffer-read-only t)
-	(setq tbmm-original-show-paren show-paren-mode)
-	(show-paren-mode 0)
 	(setq tbmm-original-line-wrap (get-line-wrap))
 	(set-line-wrap 'word)
-	(suppress-cursor 'text-browse-minor-mode))
+	(suppress-show-paren-mode 'text-browse-minor-mode)
+	(suppress-dynamic-cursor-mode 'text-browse-minor-mode)
+	(suppress-cursor-type 'text-browse-minor-mode))
     (progn
-      (setq buffer-read-only t tbmm-original-read-only)
-      (show-paren-mode (or tbmm-original-show-paren 0)) ; Emacs's demented API
+      (setq buffer-read-only tbmm-original-read-only)
       (set-line-wrap tbmm-original-line-wrap)
-      (unsuppress-cursor 'text-browse-minor-mode))))
+      (unsuppress-show-paren-mode 'text-browse-minor-mode)
+      (unsuppress-cursor-type 'text-browse-minor-mode)
+      (unsuppress-dynamic-cursor-mode 'text-browse-minor-mode))))
 
 (defun text-browse-minor-mode-toggle ()
   "Toggle `text-browse-minor-mode' without superfluous message'." ; Mode is already indicated on the mode line
   (interactive)
   (text-browse-minor-mode (if text-browse-minor-mode 0 t)))
+
+
+;;; Dynamic-Cursor minor mode
+
+(define-minor-mode dynamic-cursor-mode
+  ;; Docstring derived from Transient Mark mode in simple.el.
+  "Toggle Dynamic Cursor mode.
+With a prefix argument ARG, enable Dynamic Cursor mode if ARG is
+positive, and disable it otherwise.  If called from Lisp, enable
+Dynamic Cursor mode if ARG is omitted or nil.
+
+Dynamic Cursor mode is a global minor mode.  When enabled,
+`cursor-type' is set dynamically to reflect `mark-active'.
+
+To set `cursor-type' manually or using another mode, first disable
+Dynamic Cursor mode.
+
+Dynamic Cursor mode can be enabled or disabled buffer-locally
+using (setq-local dynamic-cursor-mode t)
+or (setq-local dynamic-cursor-mode nil).
+This will override the global setting."
+  :global t)
+
+(defun dcm--deactivate-mark ()
+  (if dynamic-cursor-mode (setq cursor-type t)))
+
+(defun dcm--activate-mark ()
+  (if dynamic-cursor-mode (setq cursor-type 'bar)))
+
+;; Adding these hooks permanently, rather than adding/removing them in DCM's on/off function, enables DCM to work properly even when turned on/off buffer-locally.
+(add-hook 'deactivate-mark-hook #'dcm--deactivate-mark)
+(add-hook 'activate-mark-hook #'dcm--activate-mark)
 
 
 ;;; Simple manual stopwatch.
@@ -750,6 +782,7 @@ Many others."
   (winner-mode)
   (delete-selection-mode) ; XXX: Really belongs in Usablizer
   (global-undo-tree-mode) ; XXX: Ditto
+  (dynamic-cursor-mode)
   (blink-cursor-mode 0)
   (menu-bar-mode 0) ; Permanent menu bar is pointless; use menu-bar-open
   (tool-bar-mode 0)

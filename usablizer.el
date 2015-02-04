@@ -1,6 +1,6 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.2.4
-;; Package-Requires: ((emacs "25") (undo-tree "0.6.5") (vimizer "0.2.4"))
+;; Version: 0.2.5
+;; Package-Requires: ((emacs "24.4") (undo-tree "0.6.5") (vimizer "0.2.6"))
 ;; Keywords: convenience
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -678,6 +678,23 @@ This command sets the values of `truncate-lines' and `word-wrap', which are sepa
   (narrow-to-region (point) (mark))
   (deactivate-mark))
 
+(defvar overlong-line-limit 950 ; Conservative limit for mail messages
+  "Limit used by `goto-next-overlong-line'.")
+
+(defun goto-next-overlong-line ()
+  "Go to column `overlong-line-limit' at next line that has at least that many chars.
+Return t if such a line found; otherwise, return nil and leave cursor at end of buffer."
+  (interactive)
+  (if (>= (current-column) overlong-line-limit) (forward-line)) ; Skip current
+  (catch 'overlong
+    (do ((_x nil)) ((eobp) nil)
+      (move-end-of-line nil)
+      (when (>= (current-column) overlong-line-limit)
+	(move-beginning-of-line nil)
+	(forward-char overlong-line-limit) ; Leave cursor at the limit
+	(throw 'overlong t))
+      (forward-line))))
+
 (defun not-hijacked-kill-buffer ()
   "Do `kill-buffer'.
 Bind a key to this function instead of directly to kill-buffer so that ido-mode won't hijack the keybinding."
@@ -806,23 +823,23 @@ If N is negative, don't delete newlines."
 
 ;; Derived from simple.el
 (defmacro define-universal-arg-funs (x)
-  `(mapc
-    #'eval
-    ',(list `(defun ,(intern (format "universal-argument-%d" x)) ()
-	       (interactive)
-	       (universal-argument-x ,x))
-	    `(defun ,(intern (format "universal-argument-more-%d" x)) (arg)
-	       (interactive "P")
-	       (setq prefix-arg (if (consp arg)
-				    (list (* ,x (car arg)))
-				  (if (eq arg '-)
-				      (list (- ,x))
-				    arg)))
-	       (when (consp prefix-arg) (universal-argument--mode))))))
+  `(progn
+     (defun ,(intern (format "universal-argument-%d" x)) ()
+       (interactive)
+       (universal-argument-x ,x))
+
+     (defun ,(intern (format "universal-argument-more-%d" x)) (arg)
+       (interactive "P")
+       (setq prefix-arg (if (consp arg)
+			    (list (* ,x (car arg)))
+			  (if (eq arg '-)
+			      (list (- ,x))
+			    arg)))
+       (when (consp prefix-arg) (universal-argument--mode)))))
 
 (define-universal-arg-funs 2)
 (define-universal-arg-funs 3)
-;; 4 not needed here, since already hardcoded in simple.el
+;; 4 not needed here, since it's already hardcoded in simple.el
 
 
 ;;; Closed-buffer tracker. Derived from:
@@ -1096,7 +1113,8 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ;; TODO change scrolling for undo-tree visualizer to use scroll-lock-mode, or at least stop scrolling conservatively. Just setting scroll-conservatively with let binding doesn't work; global value has to be set. Maybe using make-local-variable?
      ([Scroll_Lock] scroll-lock-mode) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
      ([S-f17] check-parens-and-report)
-     ([M-f17] show-paren-mode)))
+     ([M-f17] show-paren-mode)
+     ([M-S-f17] goto-next-overlong-line)))
 
   (mapc
    (lambda (x) (define-key universal-argument-map (car x) (cadr x)))
