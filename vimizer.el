@@ -1,5 +1,5 @@
 ;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
-;; Version: 0.2.6
+;; Version: 0.2.7
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
 
@@ -22,7 +22,7 @@
 ;;
 ;; 1. Vim-style line-based cutting, copying, pasting, and selection, and repeatable pasting.
 ;; Press these keys for these features:
-;; S-Cut or S-Copy: cut or copy the current logical line, regardless of where the cursor currently is on the line. Use a prefix arg to cut or copy the specified number of lines.
+;; S-Cut or S-Copy: cut or copy the current logical line, regardless of where the cursor is on the line. Use a prefix arg to cut or copy the specified number of logical lines, starting with the current one. If the region is active, then cut or copy all logical lines that have at least one character in the region.
 ;; Paste: paste text from the head of the clip ring. Use a prefix arg to paste the specified number of copies of that text.
 ;; S-Paste: paste text from the head of the clip ring to a new line over the current logical line, regardless of where the cursor currently is on the line, and regardless of whether the pasted text was originally cut or copied as a full line. Because of this, if you press S-Cut followed by S-Paste, the text is cut and then pasted back in the same place, effectively undoing the cut. If you press S-Copy followed by S-Paste, the current logical line is duplicated.
 ;; S-SunFront: enter line-select mode. In this mode, complete logical lines are selected and highlighted, regardless of which commands you use to move the cursor. You can then cut or copy the selected text or do anything else that uses an active region. To cancel the mode, press whatever key or chord you have bound to keyboard-quit (C-g by default in Emacs).
@@ -37,7 +37,8 @@
 ;; Additional Vim-inspired features for Emacs are in Usablizer, a companion package for Vimizer.
 ;;
 ;; Unlike other vimization packages for Emacs (and Vim itself), Vimizer and Usablizer don't separate insertion and command modes, because such separation results in accidentally inserting the names of commands into buffers when you try to execute the commands, and accidentally mangling buffers with random edits when you try to insert text. Instead, these packages provide modeless bindings to function keys, so the commands are always available.
-
+;;
+;; Note that Emacs's shift-select-mode, enabled by default, interferes with Vimizer's line-select mode in Emacs 24.4 and earlier, due to bug #19513. This is fixed in 24.5 and later. If you're using 24.4 or earlier, globally disable shift-select-mode to work around this bug. When Vimizer's line-select mode is active, it buffer-locally disables shift-select-mode, so there's no interference on 24.5 and later.
 
 ;;; Code:
 

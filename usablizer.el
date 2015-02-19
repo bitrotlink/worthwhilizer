@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.2.5
+;; Version: 0.2.6
 ;; Package-Requires: ((emacs "24.4") (undo-tree "0.6.5") (vimizer "0.2.6"))
 ;; Keywords: convenience
 
@@ -74,12 +74,10 @@
 ;; Emacs lets your registers become stale. Usablizer provides register-swap-back, which solves this problem.
 ;;
 ;; 6. A closed-buffer tracker.
-;; Tracks your history of closed buffers and enables reopening them. Restores major mode, minor modes, point, mark, mark ring, and other buffer-local variables. Currently only implemented for file-visiting buffers.
+;; Tracks your history of closed buffers and enables reopening them. Restores major mode, minor modes, point, mark, mark ring, and other buffer-local variables. Currently only implemented for file-visiting buffers. This feature only works in Emacs 25 and later.
 
 
 ;;; Code:
-
-;;; TODO: Ensure my patch for desktop-create-buffer is accepted in time for Emacs 25.1.
 
 (require 'misc) ; For forward-to-word
 (require 'delsel) ; For minibuffer-keyboard-quit
@@ -90,19 +88,23 @@
 
 (defalias 'isearch-truncate-or-abort 'isearch-abort) ; See isearch-really-abort
 
-;; Copied from desktop.el:
-;; Just to silence the byte compiler.
-;; Dynamically bound in `desktop-read'.
-(defvar desktop-first-buffer)
-(defvar desktop-buffer-ok-count)
-(defvar desktop-buffer-fail-count)
-
-;; And to make the closed-buffer tracker not fail:
-;; (No idea why the (require 'desktop) above doesn't cover these.)
-(defvar desktop-buffer-locals)
-(defvar desktop-buffer-major-mode)
 
 ;;; Utilities
+
+(defmacro dlet (binders &rest body)
+  "Like `let', but with dynamic binding. Uses Stefan's weird local-specialness."
+  (unless (listp binders) (error "%S is not a list" binders))
+  `(progn ; Contain the local-specialness, so it doesn't infect «let»s outside dlet
+     ;; This is because the purpose of local-specialness is to avoid global infection
+     ,@(let (vardefs) ; Generate all the «defvar»s
+	 (dolist (binder binders (nreverse vardefs))
+	   (cond ((symbolp binder)
+		  (push `(defvar ,binder) vardefs))
+		 ((and (listp binder)
+		       (symbolp (car binder)))
+		  (push `(defvar ,(car binder)) vardefs))
+		 (t (error "%S is not a symbol or list" binder)))))
+     (let ,binders ,@body)))
 
 ;; Add this function to find-file-hook to prevent your positions stored in registers from becoming stale when you edit a file after closing and reopening it.
 (defun register-swap-back () ; This ought to be in register.el
@@ -189,6 +191,9 @@ Otherwise, return nil."
   (if (equal (symbol-value sym)
 	     (eval (car (get sym 'standard-value))))
       (set sym val)))
+
+(defun average (&rest args)
+  (/ (apply #'+ args) (length args)))
 
 
 ;;; Replace Emacs's point-losing pop-to-mark-command
@@ -860,7 +865,7 @@ See also `closed-buffer-history-max-full-items'.")
 (defvar closed-buffer-history-max-full-items 100
   "Max full items to save on `closed-buffer-history' list.
 Use -1 for unlimited, or zero to disable tracking of full items. If this limit is less than `closed-buffer-history-max-saved-items', then non-full items will be stored for the difference. If this limit is greater, then `closed-buffer-history-max-saved-items' is the controlling limit. When new items are added to `closed-buffer-history', full items which exceed this limit are converted to non-full items.
- A full item is a buffer state, including `buffer-file-name', `point', `mark', `mark-ring', and various other buffer local variables as configured for `desktop-save-mode', but excluding the buffer contents, which are stored only in the named file. A non-full item is just a file name.")
+ A full item is a buffer state, including `buffer-file-name', `point', `mark', `mark-ring', `major-mode', minor modes, and various other buffer local variables as configured for `desktop-save-mode', but excluding the buffer contents, which are stored only in the named file. A non-full item is just a file name.")
 
 ;; Copied from assq-delete-all in subr.el, but «eq» replaced by «equal».
 (defun assoc-delete-all (key alist)
@@ -890,10 +895,10 @@ Elements of ALIST that are not conses are ignored."
     (untrack-closed-buffer buffer-file-name)
     ;; Add to head of list
     (pushnew (if (desktop-save-buffer-p buffer-file-name (buffer-name) major-mode)
-		     (cdr (save-current-buffer
-			    (desktop-buffer-info (current-buffer))))
-		   buffer-file-name)
-		 closed-buffer-history)
+		 (cdr (save-current-buffer
+			(desktop-buffer-info (current-buffer))))
+	       buffer-file-name)
+	     closed-buffer-history)
     ;; Truncate excess elements
     (let* ((max-full closed-buffer-history-max-full-items)
 	   (max-saved closed-buffer-history-max-saved-items)
@@ -923,22 +928,20 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
 				      closed-buffer-history)
 			      nil t) nil t))
   (let* ((bufinfo (assoc name closed-buffer-history))
-	 (bufinfo (or bufinfo (if (memq name closed-buffer-history) '(nil nil nil nil nil nil nil nil)))))
-    (unless bufinfo (error "Internal error in reopen-buffer while finding %s" name))
+	 (bufinfo (or bufinfo (if (memq name closed-buffer-history)
+				  (make-list 8 nil)))))
+    (assert bufinfo)
     ;;Load from info list, using base filename as new buffer name.
-    ;; Avoid globally setting unneeded variables intended internally for desktop-read.
-    ;; Argh, can't use «let», because I have lexical-binding for this file, and there's
-    ;; no «dynamic-let», so I have to set them globally.
-    (setq desktop-buffer-ok-count 0)
-    (setq desktop-buffer-fail-count 0)
-    (setq desktop-first-buffer nil)
-    (let ((buf (silently ; Silence desktop-restore-file-buffer if file can't be found
-		(apply 'desktop-create-buffer (string-to-number desktop-file-version)
-		       name (file-name-nondirectory name) (cddr bufinfo)))))
-      ;; And now get rid of them.
-      (makunbound 'desktop-buffer-ok-count)
-      (makunbound 'desktop-buffer-fail-count)
-      (makunbound 'desktop-first-buffer)
+    (let ((buf
+	   ;; Set variables needed by desktop-create-buffer.
+	   ;; Need dlet because they're locally special in desktop.el, not globally.
+	   ;; According to Stefan, this is not weird.
+	   (dlet ((desktop-buffer-ok-count 0)
+		  (desktop-buffer-fail-count 0)
+		  desktop-first-buffer)
+		 (silently ; Silence desktop-restore-file-buffer if file can't be found
+		  (apply 'desktop-create-buffer (string-to-number desktop-file-version)
+			 name (file-name-nondirectory name) (cddr bufinfo))))))
       (if buf (progn
 		(untrack-closed-buffer name)
 		(with-current-buffer buf (run-hooks 'desktop-delay-hook))
@@ -958,6 +961,14 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
 	  (untrack-closed-buffer name))
 	(unless (or remove-missing (called-interactively-p 'any))
 	  (error "Failed to open file %s" name))))))
+
+(unless (or (>= emacs-major-version 25)
+	    ;; TODO: Remove this when 25.1 is released
+	    (bound-and-true-p desktop-mark-ring-tablized-backported))
+  (defun reopen-buffer (&rest _dummy)
+    (interactive)
+    ;; Relies on Emacs commit# c96983efef17
+    (user-error "reopen-buffer requires Emacs 25 or later")))
 
 
 ;;; Init
@@ -1114,7 +1125,9 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([Scroll_Lock] scroll-lock-mode) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
      ([S-f17] check-parens-and-report)
      ([M-f17] show-paren-mode)
-     ([M-S-f17] goto-next-overlong-line)))
+     ([M-S-f17] goto-next-overlong-line)
+     ([XF86Search] rgrep)
+     ([M-XF86Search] lgrep)))
 
   (mapc
    (lambda (x) (define-key universal-argument-map (car x) (cadr x)))

@@ -1,5 +1,5 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.2.5
+;; Version: 0.2.6
 ;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.6") (usablizer "0.2.5"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -65,6 +65,7 @@
 (declare-function 'position "cl")
 (declare-function 'intersection "cl")
 ;; ...but it whines about them anyway. Yay, Emacs.
+
 
 ;;; Utilities
 
@@ -369,8 +370,8 @@ This is unlike Emacs's `whitespace-mode' variable, which isn't set by turning on
 (defun whitespace-turn-off--record-actually-off ()
   (setq whitespace-mode-actually-on nil))
 
-(advice-add 'whitespace-turn-on :after #'whitespace-turn-on--record-actually-on)
-(advice-add 'whitespace-turn-off :after #'whitespace-turn-off--record-actually-off)
+(advice-add #'whitespace-turn-on :after #'whitespace-turn-on--record-actually-on)
+(advice-add #'whitespace-turn-off :after #'whitespace-turn-off--record-actually-off)
 
 
 ;;; Monospace mode
@@ -815,8 +816,6 @@ Many others."
    'home-list
    'end-list)
 
-  (add-hook 'message-mode-hook (lambda () (auto-fill-mode 0))) ; FIXME: insert (at front) hook to message-send-mail-function to check for lines longer than 1000 chars, and offer to do hard word wrap before sending. And test this.
-
 ;; Highlight erroneous whitespace
   ;; But if user already customized, then don't override that or turn on globally
   (if (maybe-set 'whitespace-style
@@ -843,6 +842,7 @@ Many others."
   "Settings that you probably don't want."
   (remove-hook 'prog-mode-hook 'monospace-mode) ; Remove the sop to the luddites
   (add-hook 'find-file-hook '(lambda () (setq buffer-read-only t))) ; Avoid accidentally modifying stuff
+  (add-hook 'message-mode-hook (lambda () (auto-fill-mode 0))) ; FIXME: insert (at front) hook to message-send-mail-function to check for lines longer than 1000 chars, and offer to do hard word wrap before sending. And test this.
   (setq debug-on-error t)
   (setq eval-expression-print-length nil)
   (setq eval-expression-print-level nil)
