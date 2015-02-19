@@ -38,7 +38,7 @@
 ;;
 ;; Unlike other vimization packages for Emacs (and Vim itself), Vimizer and Usablizer don't separate insertion and command modes, because such separation results in accidentally inserting the names of commands into buffers when you try to execute the commands, and accidentally mangling buffers with random edits when you try to insert text. Instead, these packages provide modeless bindings to function keys, so the commands are always available.
 ;;
-;; Note that Emacs's shift-select-mode, enabled by default, interferes with Vimizer's line-select mode in Emacs 24.4 and earlier, due to bug #19513. This is fixed in 24.5 and later. If you're using 24.4 or earlier, globally disable shift-select-mode to work around this bug. When Vimizer's line-select mode is active, it buffer-locally disables shift-select-mode, so there's no interference on 24.5 and later.
+;; Note that Emacs's shift-select-mode, enabled by default, interferes with Vimizer's line-select mode in Emacs 24.4 and earlier, due to bug #19513. This is fixed in Emacs 25 and later. If you're using 24.4 or earlier, globally disable shift-select-mode to work around this bug. When Vimizer's line-select mode is active, it buffer-locally disables shift-select-mode, so there's no interference on 25 and later.
 
 ;;; Code:
 
