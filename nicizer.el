@@ -1,5 +1,5 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.2.6
+;; Version: 0.2.7
 ;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.6") (usablizer "0.2.5"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -188,7 +188,7 @@ Show nothing when they're on, to avoid cluttering the mode line."
 		'(isearch-forward-exit-minibuffer isearch-reverse-exit-minibuffer))
     (define-key isearch-mode-map [down] 'isearch-ring-advance)
     (define-key isearch-mode-map [up] 'isearch-ring-retreat)
-    (add-hook 'post-command-hook 'maybe-remove-up-down-ring)))
+    (add-hook 'post-command-hook #'maybe-remove-up-down-ring)))
 
 ;; Search ring movement no longer needed if user is typing a search string
 (defun maybe-remove-up-down-ring ()
@@ -733,9 +733,9 @@ See comments in code for `switch-to-new-buffer' for details."
 	      #'isearch-forward-exit-minibuffer--remove-up-down-ring)
   (advice-add 'isearch-reverse-exit-minibuffer :before
 	      #'isearch-forward-exit-minibuffer--remove-up-down-ring)
-  (add-hook 'isearch-mode-hook 'up-down-ring-isearch)
+  (add-hook 'isearch-mode-hook #'up-down-ring-isearch)
   ;; To prevent maybe-remove-up-down-ring from being left in post-command-hook
-  (add-hook 'isearch-mode-end-hook 'remove-up-down-ring))
+  (add-hook 'isearch-mode-end-hook #'remove-up-down-ring))
 
 ;;;###autoload
 (defun nicizer-init ()
@@ -825,7 +825,7 @@ Many others."
   ;; Use variable-pitch font by default
   (when (string= (face-attribute 'default :family) "DejaVu Sans Mono") ; Don't override user's custom config
     (set-face-attribute 'default nil :family "Sans Serif") ; Or "DejaVu Serif"
-    (mapc (lambda (x) (add-hook x 'monospace-mode))
+    (mapc (lambda (x) (add-hook x #'monospace-mode))
 	  '(term-mode-hook
 	    dired-after-readin-hook ; Because dired-mode uses spaces for column alignment, instead of using tabulated-list-mode
 	    ibuffer-mode-hook ; Ditto
@@ -833,15 +833,15 @@ Many others."
 	    eshell-mode-hook ; Ditto
 	    prog-mode-hook))) ; Sop to the luddites
 
-  (add-hook 'buffer-face-mode-hook 'set-monospace-mode-lighter)
-  (add-hook 'rotate-mark-ring-hook 'track-mark-ring-position) ; See Usablizer
-  (add-hook 'flyspell-mode-hook 'maybe-flyspell-buffer))
+  (add-hook 'buffer-face-mode-hook #'set-monospace-mode-lighter)
+  (add-hook 'rotate-mark-ring-hook #'track-mark-ring-position) ; See Usablizer
+  (add-hook 'flyspell-mode-hook #'maybe-flyspell-buffer))
 
 ;;;###autoload
 (defun nicizer-init-niche ()
   "Settings that you probably don't want."
   (remove-hook 'prog-mode-hook 'monospace-mode) ; Remove the sop to the luddites
-  (add-hook 'find-file-hook '(lambda () (setq buffer-read-only t))) ; Avoid accidentally modifying stuff
+  (add-hook 'find-file-hook (lambda () (setq buffer-read-only t))) ; Avoid accidentally modifying stuff
   (add-hook 'message-mode-hook (lambda () (auto-fill-mode 0))) ; FIXME: insert (at front) hook to message-send-mail-function to check for lines longer than 1000 chars, and offer to do hard word wrap before sending. And test this.
   (setq debug-on-error t)
   (setq eval-expression-print-length nil)
@@ -857,9 +857,9 @@ Many others."
   ;; 83, which has monospace char size 7x14 pixels, proportional size 3-9x15 (width 3 for i and j, 9 for W).
   ;; 75, which is still readable but too small for comfort.
   (set-scroll-bar-mode nil) ; TODO: have (thin) scroll bars, but overlay them with the gutters, rather than put them parallel to the gutters. This avoids wasting space. Use just a lightweight-shaded block for the scroll bar's slider to avoid obscuring the markings shown in the gutters.
-  ;; (add-hook 'emacs-lisp-mode-hook 'turn-on-eldoc-mode)
-  ;; (add-hook 'lisp-interaction-mode-hook 'turn-on-eldoc-mode)
-  ;; (add-hook 'ielm-mode-hook 'turn-on-eldoc-mode)
+  ;; (add-hook 'emacs-lisp-mode-hook #'turn-on-eldoc-mode)
+  ;; (add-hook 'lisp-interaction-mode-hook #'turn-on-eldoc-mode)
+  ;; (add-hook 'ielm-mode-hook #'turn-on-eldoc-mode)
   (set-case-syntax-delims ?§ ?‡ (standard-case-table))
   (mkdir (concat user-emacs-directory "backupfiles") t)
   (mkdir (concat user-emacs-directory "autosavefiles") t)
@@ -875,11 +875,11 @@ Many others."
   (setq tags-table-list '("/usr/local/src/emacs/TAGS" "/usr/local/src/emacs/TAGS-LISP"))
 
   (ido-mode t)
-  (add-hook 'ido-setup-hook 'nicizer-ido-keys)
+  (add-hook 'ido-setup-hook #'nicizer-ido-keys)
   (setq ido-default-file-method 'selected-window)
   (setq ido-default-buffer-method 'selected-window)
   ;; (setq ido-use-virtual-buffers t) ; Don't like after all; when I close a buffer, I want it off my working list
-  (add-hook 'ido-minibuffer-setup-hook 'ido-disable-line-trucation)
+  (add-hook 'ido-minibuffer-setup-hook #'ido-disable-line-trucation)
   ;; Copied from http://www.emacswiki.org/cgi-bin/wiki/InteractivelyDoThings
   ;; But this is still lame; even for long lists, it uses a tiny area (the minibuffer) and makes me scroll a lot, rather than using the full vertical screen space, or the full screen.
   ;; Display ido results vertically, rather than horizontally
@@ -909,9 +909,9 @@ Many others."
   ;; (pushnew 'text-scale-mode-lighter desktop-locals-to-save)
 
   ;; TODO: review these after upgrade to workgroups2, and move to nicizer-init or -stateful.
-  (add-hook 'desktop-save-hook 'deduplicate-savehist-desktop-vars)
-  (add-hook 'desktop-save-hook 'wg-quiet-update)
-  (add-hook 'desktop-after-read-hook 'conditionally-add-desktop-autosave)
+  (add-hook 'desktop-save-hook #'deduplicate-savehist-desktop-vars)
+  (add-hook 'desktop-save-hook #'wg-quiet-update)
+  (add-hook 'desktop-after-read-hook #'conditionally-add-desktop-autosave)
 
   ;; Outgoing message handling
   (pushnew '(utf-8 . 8bit) mm-body-charset-encoding-alist) ; Make Emacs stop mangling my messages.
@@ -927,7 +927,7 @@ Many others."
   (mkdir message-outbox-directory t)
   (mkdir message-queued-drafts-directory t)
   (setq message-send-mail-function 'queue-message-to-outbox)
-  (add-hook 'message-sent-hook 'discard-draft)
+  (add-hook 'message-sent-hook #'discard-draft)
   (fset 'message-make-message-id 'nicizer-message-make-message-id)
   (fset 'message-make-date 'nicizer-message-make-date-UTC))
 
@@ -952,9 +952,9 @@ Many others."
 
   (setq ido-save-directory-list-file (concat user-emacs-directory "ido.last"))
 
-  (add-hook 'post-self-insert-hook 'typing-burst-timer)
-  (add-hook 'post-command-hook 'typing-burst-typo-counter)
-  (add-hook 'kill-emacs-hook 'dump-typing-burst-history)
+  (add-hook 'post-self-insert-hook #'typing-burst-timer)
+  (add-hook 'post-command-hook #'typing-burst-typo-counter)
+  (add-hook 'kill-emacs-hook #'dump-typing-burst-history)
 
   (eval-and-compile (require 'ecomplete))
   (setq ecomplete-database-file (concat user-emacs-directory "ecompleterc"))

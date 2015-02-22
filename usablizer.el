@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.2.7
+;; Version: 0.2.8
 ;; Package-Requires: ((emacs "24.4") (undo-tree "0.6.5") (vimizer "0.2.6"))
 ;; Keywords: convenience
 
@@ -116,7 +116,7 @@ Uses the local-specialness feature of `defvar'."
 	       (eq (cadr elt) 'file-query)
 	       (equal (caddr elt) buffer-file-name))
       (setcdr elt (copy-marker (cadddr elt)))
-      (add-hook 'kill-buffer-hook 'register-swap-out nil t))))
+      (add-hook 'kill-buffer-hook #'register-swap-out nil t))))
 
 ;; point-to-register adds register swap outs, but it isn't used when restoring desktop, so add them by adding this function to desktop-delay-hook
 (defun add-register-swap-outs ()
@@ -127,7 +127,7 @@ Uses the local-specialness feature of `defvar'."
 	      (when (and (markerp (cdr elem))
 			 (eq (marker-buffer (cdr elem)) buf))
 		(with-current-buffer buf
-		  (add-hook 'kill-buffer-hook 'register-swap-out nil t))
+		  (add-hook 'kill-buffer-hook #'register-swap-out nil t))
 		(throw 'done nil))))) ; I don't remember where I got this idea from
 	(buffer-list)))
 
@@ -975,9 +975,9 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
 ;;; Init
 
 ;; These are essential usability issues, so I'm putting them at top level, not in a function
-(add-hook 'find-file-hook 'register-swap-back)
-(add-hook 'desktop-delay-hook 'add-register-swap-outs t) ; Can't use desktop-after-read-hook for register swap outs since buffers might be lazily restored. Since I'm using desktop-delay-hook, must append, so that the set-marker calls that are added to desktop-delay-hook when desktop-create-buffer runs are run first.
-(add-hook 'kill-buffer-hook 'track-closed-buffer)
+(add-hook 'find-file-hook #'register-swap-back)
+(add-hook 'desktop-delay-hook #'add-register-swap-outs t) ; Can't use desktop-after-read-hook for register swap outs since buffers might be lazily restored. Since I'm using desktop-delay-hook, must append, so that the set-marker calls that are added to desktop-delay-hook when desktop-create-buffer runs are run first.
+(add-hook 'kill-buffer-hook #'track-closed-buffer)
 
 ;;;###autoload
 (defun usablizer-bind-keys ()
@@ -1169,8 +1169,8 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
   (global-set-key [S-find] 'isearch-backward)
 
   ;; XXX: Manual section «(emacs) Init Rebinding» says I'm supposed to do this:
-  ;; (add-hook 'minibuffer-setup-hook 'usablizer-fix-minibuffer-maps)
-  ;; (add-hook 'isearch-mode-hook 'usablizer-fix-isearch-map)
+  ;; (add-hook 'minibuffer-setup-hook #'usablizer-fix-minibuffer-maps)
+  ;; (add-hook 'isearch-mode-hook #'usablizer-fix-isearch-map)
   ;; But this seems to work just as well:
   (usablizer-fix-minibuffer-maps)
   (usablizer-fix-isearch-map))

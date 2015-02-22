@@ -1,5 +1,5 @@
 ;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
-;; Version: 0.2.7
+;; Version: 0.2.8
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
 
@@ -340,7 +340,7 @@ Optional ARG is passed to the next command."
   (unless cctm-original-blink-cursor-status ; In case user activates twice
     (setq cctm-original-blink-cursor-status (if blink-cursor-mode 1 0)))
   (blink-cursor-mode) ; Visually indicate cctm is active
-  (add-hook 'post-command-hook 'cctm-maybe-cut-copy)) ; Intentionally not buffer-local
+  (add-hook 'post-command-hook #'cctm-maybe-cut-copy)) ; Intentionally not buffer-local
 
 ;; If in cut-copy transient mode, do cut or copy with next motion command
 (defun cctm-maybe-cut-copy ()
@@ -418,9 +418,9 @@ Select the current logical line, and select more logical lines when point is mov
     (unless lsmm-active ; Line-select mode might already be active, so don't re-init
       (suppress-shift-select-mode 'line-select-minor-mode)
       (suppress-show-paren-mode 'line-select-minor-mode)
-      (add-hook 'post-command-hook 'lsmm-dominate-point-mark nil t)
-      (add-hook 'deactivate-mark-hook 'line-select-minor-mode-disable t)
-      (add-hook 'rotate-mark-ring-hook 'lsmm-disable-and-deactivate-mark nil t)
+      (add-hook 'post-command-hook #'lsmm-dominate-point-mark nil t)
+      (add-hook 'deactivate-mark-hook #'line-select-minor-mode-disable t)
+      (add-hook 'rotate-mark-ring-hook #'lsmm-disable-and-deactivate-mark nil t)
       (setq lsmm-active t))
       ;; TODO: draw a thin horizontal black line the full width of the window, below the last selected text line (or above it, if point is before mark), for the same reason that I switch to vertical black line cursor between characters when mark is active and line-select mode isn't active. Then visually, the cursor has become that horizontal line.
     (lsmm-set-anchors nil)))
