@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.2.6
+;; Version: 0.2.7
 ;; Package-Requires: ((emacs "24.4") (undo-tree "0.6.5") (vimizer "0.2.6"))
 ;; Keywords: convenience
 
@@ -92,10 +92,12 @@
 ;;; Utilities
 
 (defmacro dlet (binders &rest body)
-  "Like `let', but with dynamic binding. Uses Stefan's weird local-specialness."
+  "Like `let', but always bind dynamically, even if `lexical-binding' is t.
+Uses the local-specialness feature of `defvar'."
   (unless (listp binders) (error "%S is not a list" binders))
-  `(progn ; Contain the local-specialness, so it doesn't infect «let»s outside dlet
-     ;; This is because the purpose of local-specialness is to avoid global infection
+  ;; Contain the local-specialness, so it doesn't infect «let»s outside dlet,
+  ;; because the purpose of local-specialness is to avoid global infection.
+  `(progn
      ,@(let (vardefs) ; Generate all the «defvar»s
 	 (dolist (binder binders (nreverse vardefs))
 	   (cond ((symbolp binder)
@@ -194,6 +196,22 @@ Otherwise, return nil."
 
 (defun average (&rest args)
   (/ (apply #'+ args) (length args)))
+
+;; Copied from assq-delete-all in subr.el, but «eq» replaced by «equal»
+(defun assoc-delete-all (key alist)
+  "Delete from ALIST all elements whose car is `equal' to KEY.
+Return the modified alist.
+Elements of ALIST that are not conses are ignored."
+  (while (and (consp (car alist))
+	      (equal (car (car alist)) key))
+    (setq alist (cdr alist)))
+  (let ((tail alist) tail-cdr)
+    (while (setq tail-cdr (cdr tail))
+      (if (and (consp (car tail-cdr))
+	       (equal (car (car tail-cdr)) key))
+	  (setcdr tail (cdr tail-cdr))
+	(setq tail tail-cdr))))
+  alist)
 
 
 ;;; Replace Emacs's point-losing pop-to-mark-command
@@ -847,12 +865,12 @@ If N is negative, don't delete newlines."
 ;; 4 not needed here, since it's already hardcoded in simple.el
 
 
-;;; Closed-buffer tracker. Derived from:
+;;; Closed-buffer tracker. Inspired by:
 ;;; http://stackoverflow.com/questions/2227401/how-to-get-a-list-of-last-closed-files-in-emacs
 
 (defvar closed-buffer-history nil
   "Reverse chronological list of closed buffers.
-This list stores filenames and/or full buffer states as stored by `desktop-save-mode', including point, mark, and various other buffer local variables.
+This list stores filenames and/or full buffer states as stored by `desktop-save-mode', including point, mark, and various other buffer-local variables.
 The list size is limited by `closed-buffer-history-max-saved-items' and `closed-buffer-history-max-full-items'.
 When a buffer already in the list is closed again, it's moved to the head of the list.")
 
@@ -864,27 +882,11 @@ See also `closed-buffer-history-max-full-items'.")
 
 (defvar closed-buffer-history-max-full-items 100
   "Max full items to save on `closed-buffer-history' list.
-Use -1 for unlimited, or zero to disable tracking of full items. If this limit is less than `closed-buffer-history-max-saved-items', then non-full items will be stored for the difference. If this limit is greater, then `closed-buffer-history-max-saved-items' is the controlling limit. When new items are added to `closed-buffer-history', full items which exceed this limit are converted to non-full items.
- A full item is a buffer state, including `buffer-file-name', `point', `mark', `mark-ring', `major-mode', minor modes, and various other buffer local variables as configured for `desktop-save-mode', but excluding the buffer contents, which are stored only in the named file. A non-full item is just a file name.")
-
-;; Copied from assq-delete-all in subr.el, but «eq» replaced by «equal».
-(defun assoc-delete-all (key alist)
-  "Delete from ALIST all elements whose car is `equal' to KEY.
-Return the modified alist.
-Elements of ALIST that are not conses are ignored."
-  (while (and (consp (car alist))
-	      (equal (car (car alist)) key))
-    (setq alist (cdr alist)))
-  (let ((tail alist) tail-cdr)
-    (while (setq tail-cdr (cdr tail))
-      (if (and (consp (car tail-cdr))
-	       (equal (car (car tail-cdr)) key))
-	  (setcdr tail (cdr tail-cdr))
-	(setq tail tail-cdr))))
-  alist)
+Use -1 for unlimited, or zero to disable tracking of full items. If this limit is less than `closed-buffer-history-max-saved-items', then non-full items will be stored for the difference. If this limit is greater, then `closed-buffer-history-max-saved-items' is the controlling limit. When new items are added to `closed-buffer-history', full items which exceed this limit are converted to non-full items. The purpose of that is to save space.
+ A full item is a buffer state, including `buffer-file-name', `point', `mark', `mark-ring', `major-mode', minor modes, and various other buffer-local variables as configured for `desktop-save-mode', but excluding the buffer contents, which are stored only in the named file. A non-full item is just a file name.")
 
 (defun untrack-closed-buffer (name)
-  ;; Could be just name, or info list; delete in either case.
+  ;; Could be just name, or info list; delete in either case
   (setq closed-buffer-history
 	(delete name
 		(assoc-delete-all name closed-buffer-history))))
@@ -912,7 +914,6 @@ Elements of ALIST that are not conses are ignored."
 				       (setcar x (caar x)) (funcall demote (cdr x))))))
 	  (funcall demote demotees))))))
 
-
 (defun reopen-buffer (name &optional remove-missing select)
   "Open file, and restore buffer state if recorded in `closed-buffer-history'.
 Return buffer for the opened file, or nil if not listed in `closed-buffer-history'.
@@ -934,8 +935,8 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
     ;;Load from info list, using base filename as new buffer name.
     (let ((buf
 	   ;; Set variables needed by desktop-create-buffer.
-	   ;; Need dlet because they're locally special in desktop.el, not globally.
-	   ;; According to Stefan, this is not weird.
+	   ;; Need dlet because they're not globally special, but only locally
+	   ;; special in desktop.el, which according to Stefan, is not weird.
 	   (dlet ((desktop-buffer-ok-count 0)
 		  (desktop-buffer-fail-count 0)
 		  desktop-first-buffer)
@@ -947,7 +948,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
 		(with-current-buffer buf (run-hooks 'desktop-delay-hook))
 		(setq desktop-delay-hook nil)
 		(when select
-		  ;;3 lines copied from desktop-restore-file-buffer in desktop.el
+		  ;; 3 lines copied from desktop-restore-file-buffer in desktop.el
 		  (condition-case nil
 		      (switch-to-buffer buf)
 		    (error (pop-to-buffer buf))))
