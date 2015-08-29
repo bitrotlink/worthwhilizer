@@ -1,5 +1,5 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.2.7
+;; Version: 0.2.8
 ;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.6") (usablizer "0.2.5"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -682,16 +682,16 @@ See comments in code for `switch-to-new-buffer' for details."
   "Hijack the user's keybindings."
   (interactive)
   (global-set-key-list
-   `(([M-S-f13] paredit-mode)
+   `(([M-S-f14] paredit-mode)
 
      ;; Some paredit commands useful even when not in paredit mode
-     ([f13] paredit-forward-slurp-sexp)
-     ([S-f13] paredit-forward-barf-sexp)
-     ([f14] paredit-backward-slurp-sexp)
-     ([S-f14] paredit-backward-barf-sexp)
-     ([M-f14] paredit-split-sexp)
-     ([M-S-f14] paredit-join-sexps)
-     ([M-f13] paredit-raise-sexp)
+     ([f14] paredit-forward-slurp-sexp)
+     ([S-f14] paredit-forward-barf-sexp)
+     ([f13] paredit-backward-slurp-sexp)
+     ([S-f13] paredit-backward-barf-sexp)
+     ([M-f13] paredit-split-sexp)
+     ([M-S-f13] paredit-join-sexps)
+     ([M-f14] paredit-raise-sexp)
      (,(kbd "M-(") paredit-wrap-round)
      (,(kbd "M-[") paredit-wrap-square)
      (,(kbd "M-)") paredit-splice-sexp)

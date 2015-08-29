@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.2.8
+;; Version: 0.2.9
 ;; Package-Requires: ((emacs "24.4") (undo-tree "0.6.5") (vimizer "0.2.6"))
 ;; Keywords: convenience
 
@@ -91,6 +91,7 @@
 
 ;;; Utilities
 
+;; TODO: Stefan pointed out he already has this macro in cconv.el (part of Emacs), but commented out. Delete my version after he uncomments his.
 (defmacro dlet (binders &rest body)
   "Like `let', but always bind dynamically, even if `lexical-binding' is t.
 Uses the local-specialness feature of `defvar'."
@@ -1013,21 +1014,21 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-down] next-logical-line)
      ([S-prior] scroll-down-line)
      ([S-next] scroll-up-line)
-     ([f24] forward-to-word)
+     ([f17] forward-to-word)
      ([f15] reverse-rotate-mark-ring-and-point)
      ([S-f15] rotate-mark-ring-and-point)
      ([C-S-left] uf-backward-sexp) ; Using C-left and C-right for bw_word and end_wrd keys, so I get S-bw_word and S-end_wrd for uf-backward-sexp and uf-forward-sexp
      ([C-S-right] uf-forward-sexp)
-     ([S-f24] forward-to-sexp)
+     ([S-f17] forward-to-sexp)
      ([C-M-S-left] not-weird-beginning-of-defun)
      ([C-M-S-right] not-weird-end-of-defun)
-     ([M-S-f24] forward-to-defun)
+     ([M-S-f17] forward-to-defun)
      ([M-up] not-weird-backward-paragraph)
      ([M-S-down] not-weird-forward-paragraph)
      ([M-down] forward-to-paragraph)
      ([C-M-left] backward-out-list)
      ([C-M-right] out-list)
-     ([M-f24] in-list)
+     ([M-f17] in-list)
      ([S-home] home-list)
      ([S-end] end-list)
      ([M-S-home] beginning-of-visual-line)
@@ -1039,7 +1040,6 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-f21] backward-find-char-inclusive)
      ([M-f21] find-char-inclusive)
      ([M-S-f21] backward-find-char-exclusive)
-     ([f17] goto-line) ; TODO: what do I really want on f17? goto-line is too rare to waste a key on it.
      ([M-S-up] move-to-window-line-top-bottom)
      ([S-right] recenter-top-bottom)
 
@@ -1084,7 +1084,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([C-s-left] split-window-horizontally)
      ([C-s-right] delete-other-windows-horizontally) ; TODO: implement this
      ([s-delete] delete-window)
-     ([s-f24] delete-other-windows) ; xmonad uses s-space, not s-f24
+     ([s-f17] delete-other-windows) ; xmonad uses s-space, not s-f17
      ([s-undo] winner-undo) ; TODO: replace by better variant in workgroups2
      ([s-S-undo] winner-redo)
 
@@ -1124,9 +1124,9 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([M-f19] list-registers)
      ;; TODO change scrolling for undo-tree visualizer to use scroll-lock-mode, or at least stop scrolling conservatively. Just setting scroll-conservatively with let binding doesn't work; global value has to be set. Maybe using make-local-variable?
      ([Scroll_Lock] scroll-lock-mode) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
-     ([S-f17] check-parens-and-report)
-     ([M-f17] show-paren-mode)
-     ([M-S-f17] goto-next-overlong-line)
+     ([S-f11] check-parens-and-report)
+     ([M-f11] show-paren-mode)
+     ([M-S-f11] goto-next-overlong-line)
      ([XF86Search] rgrep)
      ([M-XF86Search] lgrep)))
 
