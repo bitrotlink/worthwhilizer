@@ -1,5 +1,5 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.2.8
+;; Version: 0.2.9
 ;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.6") (usablizer "0.2.5"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -261,8 +261,8 @@ Show nothing when they're on, to avoid cluttering the mode line."
 		       (,(intern (format "wg-switch-to-index-%d" i)))))
 		  forms)
 	    (push `(global-set-key ',(read (format "[M-f%d]"
-						     ;; f1-f9 for 1-9; f10 for 0
-						     (if (= i 0) 10 i)))
+						     ;; f1-f9 for 1-9; f24 for 0
+						     (if (= i 0) 24 i)))
 				   ',(intern (format "wg-switch-silently-%d" i)))
 		  forms))))))
 )
