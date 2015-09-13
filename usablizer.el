@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.2.9
+;; Version: 0.3.0
 ;; Package-Requires: ((emacs "24.4") (undo-tree "0.6.5") (vimizer "0.2.6"))
 ;; Keywords: convenience
 
@@ -883,7 +883,7 @@ See also `closed-buffer-history-max-full-items'.")
 
 (defvar closed-buffer-history-max-full-items 100
   "Max full items to save on `closed-buffer-history' list.
-Use -1 for unlimited, or zero to disable tracking of full items. If this limit is less than `closed-buffer-history-max-saved-items', then non-full items will be stored for the difference. If this limit is greater, then `closed-buffer-history-max-saved-items' is the controlling limit. When new items are added to `closed-buffer-history', full items which exceed this limit are converted to non-full items. The purpose of that is to save space.
+Use -1 for unlimited, or zero to disable tracking of full items. If this limit is less than `closed-buffer-history-max-saved-items', then non-full items will be stored for the difference. If this limit is greater, then `closed-buffer-history-max-saved-items' is the controlling limit. When new items are added to `closed-buffer-history', full items that exceed this limit are converted to non-full items. The purpose of that is to save space.
  A full item is a buffer state, including `buffer-file-name', `point', `mark', `mark-ring', `major-mode', minor modes, and various other buffer-local variables as configured for `desktop-save-mode', but excluding the buffer contents, which are stored only in the named file. A non-full item is just a file name.")
 
 (defun untrack-closed-buffer (name)

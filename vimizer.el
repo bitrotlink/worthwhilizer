@@ -1,5 +1,5 @@
 ;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
-;; Version: 0.2.8
+;; Version: 0.3.0
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
 
@@ -118,7 +118,7 @@ Buffer-locally turn off `" victim-name "'.")
 
 (defun not-presumptuous-cut-region (start end &optional msg append region)
   "Cut the region.
-Prevent `kill-region' from presumptuously appending to previously cut text if `cctm-maybe-cut-copy', `modal-cut', `cutline', or anything else is called twice in a row, or after anything else which did kill-region. If optional MSG is non-nil, print a message if region is empty.
+Prevent `kill-region' from presumptuously appending to previously cut text if `cctm-maybe-cut-copy', `modal-cut', `cutline', or anything else is called twice in a row, or after anything else that did kill-region. If optional MSG is non-nil, print a message if region is empty.
 REGION is passed as the new argument to kill-region as of Emacs 24.4, the purpose of which is to confuse you."
   (let ((kill-read-only-ok t) ; Otherwise I'd have to handle the signal from kill-region to avoid screwups
 	(empty (eq start end)))
@@ -139,7 +139,7 @@ REGION is passed as the new argument to kill-region as of Emacs 24.4, the purpos
 
 (defun cut-copy-line (cut-copy-func is-cut arg append)
   "Cut or copy the current logical line.
-If region is active, then operate on all lines which are at least partially included in region."
+If region is active, then operate on all lines that are at least partially included in region."
   (cctm-exit) ; Avoid screwing up if cutline is called while in cut or copy transient mode
   (save-excursion
     (if (and mark-active (> (point) (mark)))
@@ -172,7 +172,7 @@ If region is active, then operate on all lines which are at least partially incl
 ;; XXX: Elisp docstring syntax has no way to include other strings, so I can factor out common text?
 (defun cutline (&optional arg append)
   "Cut the current logical line, or ARG lines.
-If region is active, then operate on all lines which are at least partially included in region."
+If region is active, then operate on all lines that are at least partially included in region."
   (interactive "p")
   (cut-copy-line #'not-presumptuous-cut-region t (or arg 1) append))
 
@@ -183,7 +183,7 @@ If region is active, then operate on all lines which are at least partially incl
 
 (defun copyline (&optional arg append)
   "Copy the current logical line, or ARG lines.
-If region is active, then operate on all lines which are at least partially included in region."
+If region is active, then operate on all lines that are at least partially included in region."
   (interactive "p")
   (cut-copy-line #'not-presumptuous-copy-region nil (or arg 1) append))
 
