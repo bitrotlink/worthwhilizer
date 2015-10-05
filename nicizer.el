@@ -1,5 +1,5 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.3.0
+;; Version: 0.3.1
 ;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.6") (usablizer "0.2.5"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -605,7 +605,7 @@ This will override the global setting."
 
 (defun enable-read-write ()
   (interactive)
-  (text-browse-minor-mode 0)
+  (if text-browse-minor-mode (text-browse-minor-mode 0))
   (setq buffer-read-only nil))
 
 (defun silent-push-mark-command ()
