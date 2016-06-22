@@ -854,9 +854,10 @@ Many others."
   (setq backward-delete-char-untabify-method nil) ; Emacs's default (untabify) is annoying
   (setq x-stretch-cursor t) ; When on a tab char, it's best to notice that fact
   (setq mouse-autoselect-window t)
-  (set-face-attribute 'default nil :height 90) ; Emacs default is 98, which is too big. Smaller increments are:
-  ;; 90, which has monospace char size 7x15 pixels, proportional size 3-11x15 (width 3 for i and j, 11 for W).
-  ;; 83, which has monospace char size 7x14 pixels, proportional size 3-9x15 (width 3 for i and j, 9 for W).
+  (set-face-attribute 'default nil :height 98) ; Emacs default is 98 (9.8 points according to the docstring, though the math shows that Emacs must be assuming about 0.23 dot pitch (110 ppi)), which has monospace char size 8×15 pixels (including line and character spacing), proportional size 3-11×15 (width 3 for i and j, 11 for W). This is the smallest that clearly renders curly quotes and the curvature of a comma in proportional font DejaVu Sans Serif. On 1600×1200 15-inch T60p laptop display (about 0.19mm dot pitch; 133 ppi), this is good at about 65cm viewing distance (about one arc-minute). For coarser displays, keep 98 size (which keeps pixel size of chars) and increase viewing distance to maintain angular resolution (93cm for 1920×1200 24-inch, and 87cm for 2560×1600 30-inch). To take advantage of finer displays, keep 98 size decrease viewing distance (e.g. 58cm for 1920×1200 15-inch T61p laptop).
+  ;; Smaller increments are:
+  ;; 90, which has monospace char size 7×15 pixels, proportional size 3-11×15 (width 3 for i and j, 11 for W). (That was measured on 1400×1050 15-inch display; on 1600×1200 15-inch, height is 14 pixels, not 15. Maybe I mis-measured.)
+  ;; 83, which has monospace char size 7×14 pixels, proportional size 3-9×15 (width 3 for i and j, 9 for W).
   ;; 75, which is still readable but too small for comfort.
   (set-scroll-bar-mode nil) ; TODO: have (thin) scroll bars, but overlay them with the gutters, rather than put them parallel to the gutters. This avoids wasting space. Use just a lightweight-shaded block for the scroll bar's slider to avoid obscuring the markings shown in the gutters.
   ;; (add-hook 'emacs-lisp-mode-hook #'turn-on-eldoc-mode)
