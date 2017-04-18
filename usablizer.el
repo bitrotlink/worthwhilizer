@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.3.0
+;; Version: 0.3.1
 ;; Package-Requires: ((emacs "24.4") (undo-tree "0.6.5") (vimizer "0.2.6"))
 ;; Keywords: convenience
 
@@ -183,7 +183,7 @@ Uses the local-specialness feature of `defvar'."
 	'(([find] isearch-repeat-forward)
 	  ([S-find] isearch-repeat-backward)
 	  ([XF86Paste] isearch-yank-pop)
-	  ([remap keyboard-quit] isearch-really-abort)
+	  ;; ([remap keyboard-quit] isearch-really-abort) ; FIXME: disabling because broke in Emacs 25.1
 	  ;; ([remap partial-escape] isearch-truncate-or-abort) ; FIXME: Doesn't work, I don't know why, and don't care anymore. Hardcoding to S-escape solves the problem.
 	  ([S-escape] isearch-truncate-or-abort))))
 
@@ -964,9 +964,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
 	(unless (or remove-missing (called-interactively-p 'any))
 	  (error "Failed to open file %s" name))))))
 
-(unless (or (>= emacs-major-version 25)
-	    ;; TODO: Remove this when 25.1 is released
-	    (bound-and-true-p desktop-mark-ring-tablized-backported))
+(unless (>= emacs-major-version 25)
   (defun reopen-buffer (&rest _dummy)
     (interactive)
     ;; Relies on Emacs commit# c96983efef17
@@ -1063,10 +1061,10 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([M-S-f16] flyspell-mode-toggle)
 
      ;; File, buffer, and window management
-     ([SunOpen] switch-to-buffer) ; ido-mode remaps to ido-switch-buffer
-     ([S-SunOpen] find-file)
-     ([M-SunOpen] ibuffer)
-     ([M-S-SunOpen] bury-buffer)
+     ([XF86Open] switch-to-buffer) ; ido-mode remaps to ido-switch-buffer
+     ([S-XF86Open] find-file)
+     ([M-XF86Open] ibuffer)
+     ([M-S-XF86Open] bury-buffer)
      ([XF86Close] not-hijacked-kill-buffer)
      ([S-XF86Close] reopen-buffer)
      ([M-XF86Close] other-window-kill-buffer)

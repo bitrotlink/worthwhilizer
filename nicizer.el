@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.3.3
-;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.6") (usablizer "0.2.5"))
+;; Version: 0.3.4
+;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.6") (usablizer "0.3.1"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -225,11 +225,11 @@ Show nothing when they're on, to avoid cluttering the mode line."
 
 (defun ido-disable-line-trucation () (set (make-local-variable 'truncate-lines) nil))
 
-;; The following enables pressing SunOpen twice to create and switch to a new buffer, and S-SunOpen twice to do dired-jump. (Usablizer's related global keybindings enable pressing SunOpen once to open buffer switcher, or S-SunOpen once to open file finder.)
+;; The following enables pressing XF86Open twice to create and switch to a new buffer, and S-XF86Open twice to do dired-jump. (Usablizer's related global keybindings enable pressing XF86Open once to open buffer switcher, or S-XF86Open once to open file finder.)
 (defun nicizer-ido-keys () ; Add this to ido-setup-hook
-;;  (define-key ido-completion-map '[SunOpen] 'ido-enter-find-file) ; Don't want after all
-  (define-key ido-completion-map '[SunOpen] 'switch-to-new-buffer)
-  (define-key ido-completion-map '[S-SunOpen] 'dired-jump-from-ido))
+;;  (define-key ido-completion-map '[XF86Open] 'ido-enter-find-file) ; Don't want after all
+  (define-key ido-completion-map '[XF86Open] 'switch-to-new-buffer)
+  (define-key ido-completion-map '[S-XF86Open] 'dired-jump-from-ido))
 
 ;; By default there's some overlap (file-name-history regexp-search-ring search-ring), so remove it. savehist mode dynamically grows savehist-minibuffer-history-variables, so overlaps must be dynamically removed from desktop-globals-to-save:
 (defun deduplicate-savehist-desktop-vars ()
@@ -645,7 +645,7 @@ Enable `undo-tree-mode' and `whitespace-mode' in the new buffer, and enable auto
 	      (format (concat user-emacs-directory "untitled/%s")
 		      (buffer-name)))
 	(auto-save-mode))
-      ;; If running from ido, can't just switch to buffer, because aborting recursive edit overrides buffer selection on exit, and I can't just exit-recursive-edit since that'll just accept ido's default and cause ido to override my buffer switch, so I have to switch after aborting. This foobarness is all because I'm putting this function in ido-completion-map so that I can press SunOpen twice to get a new buffer (once is to run ido-switch-buffer), and ido is just so beautifully elegant in the way it handles that.
+      ;; If running from ido, can't just switch to buffer, because aborting recursive edit overrides buffer selection on exit, and I can't just exit-recursive-edit since that'll just accept ido's default and cause ido to override my buffer switch, so I have to switch after aborting. This foobarness is all because I'm putting this function in ido-completion-map so that I can press XF86Open twice to get a new buffer (once is to run ido-switch-buffer), and ido is just so beautifully elegant in the way it handles that.
       (if (= (minibuffer-depth) 0) (switch-to-buffer nb)
 	(add-hook 'post-command-hook gross-hack)
 	;; FIXME: messages "Quit", and I don't think I can avoid it without changing the C code.
@@ -710,7 +710,7 @@ See comments in code for `switch-to-new-buffer' for details."
      ([M-XF86Back] zoom-standard)
      ([M-S-XF86Back] zoom-out)
      ([C-SunFront] er/expand-region) ; selsexp key is C-SunFront ; TODO: replace this?
-     ([s-S-SunOpen] wg-switch-to-previous-workgroup)
+     ([s-S-XF86Open] wg-switch-to-previous-workgroup)
      (,(kbd "s-U") wg-switch-to-previous-workgroup)
      ([C-S-f15] ,ctl-x-map) ; genprfx. FIXME: C-S-F15 C-t does transpose-lines, as expected, but in calc mode it still tries to do transpose-lines (which doesn't work), instead of calc-transpose-lines that C-x C-t is rebound to. Is calc-mode remapping the keychord instead of the function? And where in the Emacs source code C-x is bound to ctl-x-map?
      ([C-M-f15] mode-specific-command-prefix) ; mdeprfx. FIXME: Emacs's bindings.el does (define-key global-map "\C-c" 'mode-specific-command-prefix), and C-c works, but C-M-f15 doesn't work, at least for winner mode.
