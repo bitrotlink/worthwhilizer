@@ -755,7 +755,7 @@ Many others."
 	  (?❬ ?❭)
 	  (?❮ ?❯)
 	  (?« ?») ; This was removed from Emacs 24.4 in deference to Germans, who are backward
-	  (?‟ ?”) ; U201F, not U201C, is the horizontal-reverse of U201D
+	  (?“ ?”)
 	  (?⌜ ?⌝) ; Quasi-quotation marks
 	  (?⌞ ?⌟)
 	  (?⎡ ?⎤) ; Integer ceiling
@@ -764,7 +764,7 @@ Many others."
   ;; Improved settings
   (setq inhibit-startup-screen t)
   (setq initial-scratch-message nil)
-  (fset 'display-startup-echo-area-message (lambda nil nil)) ; (setq inhibit-startup-echo-area-message t) doesn't suffice, due to the ‟weirdly extreme treatment” described for it in startup.el
+  (fset 'display-startup-echo-area-message (lambda nil nil)) ; (setq inhibit-startup-echo-area-message t) doesn't suffice, due to the “weirdly extreme treatment” described for it in startup.el
   (fset 'yes-or-no-p 'y-or-n-p)
   (setq confirm-kill-emacs 'y-or-n-p)
   (setq undo-tree-visualizer-diff t) ; FIXME: not persisting, apparently bug in undo-tree, despite var being set buffer-local before being set to nil
