@@ -357,6 +357,13 @@ This function copied from and identical to `message-make-date' in Emacs's messag
   (let ((system-time-locale "C"))
     (format-time-string "%a, %d %b %Y %T %z" now t)))
 
+(defun insert-random-password ()
+  (interactive)
+  (insert
+   (substring
+    (shell-command-to-string "base64 /dev/urandom | head -c 30 | sed -e 's/[^a-zA-Z0-9]//g'")
+    0 20)))
+
 
 ;;; Fix whitespace-mode brokenness
 
@@ -716,6 +723,7 @@ See comments in code for `switch-to-new-buffer' for details."
      ([C-M-f15] mode-specific-command-prefix) ; mdeprfx. FIXME: Emacs's bindings.el does (define-key global-map "\C-c" 'mode-specific-command-prefix), and C-c works, but C-M-f15 doesn't work, at least for winner mode.
      ([s-f23] conlock)
      ([M-S-delete] copy-last-message)
+     ([f7] insert-random-password)
      ([f8] nicizer-reset-stopwatch)
      ([f9] nicizer-read-stopwatch)
 
