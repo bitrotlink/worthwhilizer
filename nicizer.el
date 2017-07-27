@@ -1,5 +1,5 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.3.4
+;; Version: 0.3.5
 ;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.6") (usablizer "0.3.1"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -61,6 +61,15 @@
 (require 'highlight-symbol) ; TODO: probably not
 (require 'usablizer)
 (require 'scad)
+(require 'sunrise-commander)
+(require 'sunrise-x-buttons) ; Not compatible with sunrise-x-popviewer
+(require 'sunrise-x-checkpoints)
+(require 'sunrise-x-loop)
+(require 'sunrise-x-mirror)
+(require 'sunrise-x-modeline)
+;;(require 'sunrise-x-popviewer) ; Not compatible with sunrise-x-buttons, according to the docs
+(require 'sunrise-x-tabs)
+(require 'sunrise-x-tree)
 
 ;; Silence byte compiler
 (declare-function 'position "cl")
