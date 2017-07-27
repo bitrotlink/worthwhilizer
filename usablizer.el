@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.3.1
+;; Version: 0.3.2
 ;; Package-Requires: ((emacs "24.4") (undo-tree "0.6.5") (vimizer "0.2.6"))
 ;; Keywords: convenience
 
@@ -1140,7 +1140,9 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
   (define-key undo-tree-map [undo] 'undo-tree-undo)
   (define-key undo-tree-map [S-undo] 'undo-tree-redo)
   (define-key undo-tree-map [M-undo] 'undo-tree-visualize)
-
+  (define-key calc-mode-map [undo] 'calc-undo)
+  (define-key calc-mode-map [S-undo] 'calc-redo)
+  (define-key calc-mode-map [XF86Paste] 'calc-yank)
 
 ;;; Emacs: the customizable text editor, in roughly the same way that a brick wall is customizable. If you beat your head against it hard enough, you can actually shove it into a less obstructive form.
 
