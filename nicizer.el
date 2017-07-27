@@ -364,6 +364,21 @@ This function copied from and identical to `message-make-date' in Emacs's messag
     (shell-command-to-string "base64 /dev/urandom | head -c 30 | sed -e 's/[^a-zA-Z0-9]//g'")
     0 20)))
 
+(defun set-buffer-read-only ()
+  (setq buffer-read-only t))
+
+(defun add-find-file-hook-read-only (&rest args)
+  (add-hook 'find-file-hook #'set-buffer-read-only))
+
+(defun remove-find-file-hook-read-only (&rest args)
+  (remove-hook 'find-file-hook #'set-buffer-read-only))
+
+;; Copied from https://emacs.stackexchange.com/questions/24657/unadvise-a-function-remove-all-advice-from-it
+(defun advice-unadvice (sym)
+  "Remove all advices from symbol SYM."
+  (interactive "aFunction symbol: ")
+  (advice-mapc (lambda (advice _props) (advice-remove sym advice)) sym))
+
 
 ;;; Fix whitespace-mode brokenness
 
@@ -851,7 +866,11 @@ Many others."
 (defun nicizer-init-niche ()
   "Settings that you probably don't want."
   (remove-hook 'prog-mode-hook 'monospace-mode) ; Remove the sop to the luddites
-  (add-hook 'find-file-hook (lambda () (setq buffer-read-only t))) ; Avoid accidentally modifying stuff
+  (add-find-file-hook-read-only) ; Avoid accidentally modifying stuff
+  (advice-add 'package-generate-autoloads :before ; autoload-generate-file-autoloads barfs if find-file is hooked to set buffer read-only
+	      #'remove-find-file-hook-read-only)
+  (advice-add 'package-generate-autoloads :after ; restore read-only hook to find-file after autoload-generate-file-autoloads is done
+	      #'add-find-file-hook-read-only)
   (add-hook 'message-mode-hook (lambda () (auto-fill-mode 0))) ; FIXME: insert (at front) hook to message-send-mail-function to check for lines longer than 1000 chars, and offer to do hard word wrap before sending. And test this.
   (setq debug-on-error t)
   (setq eval-expression-print-length nil)
