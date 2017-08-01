@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.3.2
+;; Version: 0.3.3
 ;; Package-Requires: ((emacs "24.4") (undo-tree "0.6.5") (vimizer "0.2.6"))
 ;; Keywords: convenience
 
@@ -213,6 +213,13 @@ Elements of ALIST that are not conses are ignored."
 	  (setcdr tail (cdr tail-cdr))
 	(setq tail tail-cdr))))
   alist)
+
+(defun earmuffs-p (s)
+  "Return t if string S has earmuffs (i.e. begins and ends with asterisks)."
+  (let ((len (length s)))
+    (and (> len 1)
+	(eq ?* (string-to-char (substring s 0 1)))
+	(eq ?* (string-to-char (substring s (1- len) len))))))
 
 
 ;;; Replace Emacs's point-losing pop-to-mark-command
@@ -835,6 +842,19 @@ If N is negative, don't delete newlines."
   (interactive)
   (unless (check-parens) (message "check-parens reported no errors")))
 
+(defun quit-earmuffs ()
+  "Do `quit-window' on all windows in the current frame showing buffers
+with names satisfying `earmuffs-p', except *scratch* and *Backtrace*."
+  (interactive)
+  (mapc
+   (lambda (w)
+     (let ((bn (buffer-name (window-buffer w))))
+       (and (earmuffs-p bn)
+	    (not (equal bn "*scratch*"))
+	    (not (equal bn "*Backtrace*"))
+	    (quit-window nil w))))
+   (window-list)))
+
 
 ;;; Special case prefix args 2 and 3 since they're so common, and deserve their own keys without having to press the uarg key before them to initiate numeral entry. 4 is default for uarg, so it already doesn't require pressing an extra key. 5 and higher are infrequent enough that no special casing is needed; requiring uarg command prefix for them is ok.
 
@@ -1149,7 +1169,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
   ;;Partially fix the «escape» key
   ;;FIXME (Emacs inanity): This doesn't cover all the cases. Emacs needs surgery to get rid of all the hardcoded C-g
   (global-set-key [escape] 'keyboard-quit) ; Default binding of esc key is esc-map, which is ridiculous
-  (global-set-key [S-escape] 'partial-escape)
+  (global-set-key [S-escape] 'quit-earmuffs) ; Previously was partial-escape
   (global-set-key [M-escape] 'not-annoying-keyboard-escape-quit)
   (global-set-key [M-S-escape] esc-map) ; In case esc-map is actually needed for something (unlikely)
   (define-key undo-tree-visualizer-mode-map [remap keyboard-quit] 'undo-tree-visualizer-quit)

@@ -1,5 +1,5 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.3.5
+;; Version: 0.3.6
 ;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.6") (usablizer "0.3.1"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -747,6 +747,7 @@ See comments in code for `switch-to-new-buffer' for details."
      ([C-M-f15] mode-specific-command-prefix) ; mdeprfx. FIXME: Emacs's bindings.el does (define-key global-map "\C-c" 'mode-specific-command-prefix), and C-c works, but C-M-f15 doesn't work, at least for winner mode.
      ([s-f23] conlock)
      ([M-S-delete] copy-last-message)
+     ([M-find] sunrise)
      ([f7] insert-random-password)
      ([f8] nicizer-reset-stopwatch)
      ([f9] nicizer-read-stopwatch)
@@ -757,6 +758,12 @@ See comments in code for `switch-to-new-buffer' for details."
      ([M-end] silent-end-of-buffer)))
 
   (nicizer-bind-wg-switch-keys)
+
+  (define-key sr-mode-map [XF86Back] 'sr-history-prev)
+  (define-key sr-mode-map [XF86Forward] 'sr-history-next)
+  (define-key sr-mode-map [S-home] 'sr-beginning-of-buffer)
+  (define-key sr-mode-map "D" 'dired-do-delete) ; Disregard the unnecessary sr-do-delete
+  (define-key sr-mode-map "x" 'dired-do-flagged-delete) ; Disregard the superfluous sr-do-flagged-delete
 
   ;; Better access to the search history ring
   (advice-add 'isearch-repeat-forward :after
@@ -823,6 +830,11 @@ Many others."
   (tool-bar-mode 0)
   (put 'narrow-to-region 'disabled nil)
   (unclutter-mode-line) ; To undo this, use: (clutter-mode-line)
+  (setq dired-omit-verbose nil) ; Avoid noise in Sunrise Commander
+  (setq sr-use-commander-keys nil) ; Disable redundant keybindings (which also conflict with Usablizer's use of F2 and F3 for uarg-2 and uarg-3)
+  (setq dired-listing-switches "-alD")
+  (setq sr-listing-switches "-alD")
+  (setq sr-traditional-other-window t)
 
   ;; Parameterize to enable setting lighter buffer-locally
   (setcar (cdr (assoc 'buffer-face-mode minor-mode-alist))
@@ -899,7 +911,7 @@ Many others."
   ;; (add-hook 'emacs-lisp-mode-hook #'turn-on-eldoc-mode)
   ;; (add-hook 'lisp-interaction-mode-hook #'turn-on-eldoc-mode)
   ;; (add-hook 'ielm-mode-hook #'turn-on-eldoc-mode)
-  (set-case-syntax-delims ?§ ?‡ (standard-case-table))
+  ;; (set-case-syntax-delims ?§ ?‡ (standard-case-table)) ; FIXME: choose something else
   (mkdir (concat user-emacs-directory "backupfiles") t)
   (mkdir (concat user-emacs-directory "autosavefiles") t)
   (setq backup-directory-alist
