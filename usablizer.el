@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.3.3
+;; Version: 0.3.6
 ;; Package-Requires: ((emacs "24.4") (undo-tree "0.6.5") (vimizer "0.2.6"))
 ;; Keywords: convenience
 
@@ -83,6 +83,7 @@
 (require 'delsel) ; For minibuffer-keyboard-quit
 (require 'desktop) ; Used by Usablizer's closed-buffer tracker
 (require 'undo-tree) ; Emacs isn't usable without it
+(require 'calc) ; So key bindings can be added
 (eval-and-compile (require 'vimizer)) ; For global-set-key-list, vimizer-bind-keys, and the «silently» macro
 (eval-when-compile (require 'cl))
 
@@ -726,9 +727,10 @@ Return t if such a line found; otherwise, return nil and leave cursor at end of 
 	(throw 'overlong t))
       (forward-line))))
 
-(defun not-hijacked-kill-buffer ()
+(defun kill-buffer-no-ask ()
   "Do `kill-buffer'.
-Bind a key to this function instead of directly to kill-buffer so that ido-mode won't hijack the keybinding."
+Bind a key to this function instead of directly to `kill-buffer' to avoid 
+calling the latter interactively, so it will kill without asking."
   (interactive)
   (kill-buffer))
 
@@ -855,6 +857,10 @@ with names satisfying `earmuffs-p', except *scratch* and *Backtrace*."
 	    (quit-window nil w))))
    (window-list)))
 
+(defun iconify-frame (&optional _dummy)
+  "Do nothing. Override Emacs's annoying inbuilt standard function."
+  (message "iconify-frame is set to do NOTHING"))
+
 
 ;;; Special case prefix args 2 and 3 since they're so common, and deserve their own keys without having to press the uarg key before them to initiate numeral entry. 4 is default for uarg, so it already doesn't require pressing an extra key. 5 and higher are infrequent enough that no special casing is needed; requiring uarg command prefix for them is ok.
 
@@ -945,12 +951,12 @@ nil and reopen-buffer was not called interactively.
 
 If called interactively, or SELECT is non-nil, then switch to the buffer."
   (interactive
-   (list (ido-completing-read "Last closed: "
+   (list (completing-read "Last closed: "
 			      (mapcar (lambda (x) (if (consp x) (car x) x))
 				      closed-buffer-history)
 			      nil t) nil t))
   (let* ((bufinfo (assoc name closed-buffer-history))
-	 (bufinfo (or bufinfo (if (memq name closed-buffer-history)
+	 (bufinfo (or bufinfo (if (member name closed-buffer-history)
 				  (make-list 8 nil)))))
     (assert bufinfo)
     ;;Load from info list, using base filename as new buffer name.
@@ -1081,11 +1087,11 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([M-S-f16] flyspell-mode-toggle)
 
      ;; File, buffer, and window management
-     ([XF86Open] switch-to-buffer) ; ido-mode remaps to ido-switch-buffer
+     ([XF86Open] switch-to-buffer)
      ([S-XF86Open] find-file)
      ([M-XF86Open] ibuffer)
      ([M-S-XF86Open] bury-buffer)
-     ([XF86Close] not-hijacked-kill-buffer)
+     ([XF86Close] kill-buffer-no-ask)
      ([S-XF86Close] reopen-buffer)
      ([M-XF86Close] other-window-kill-buffer)
      ([s-XF86Close] kill-buffer-and-window)

@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.3.6
-;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.6") (usablizer "0.3.1"))
+;; Version: 0.3.8
+;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.6") (usablizer "0.3.6"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -48,28 +48,29 @@
 (require 'desktop)
 (require 'message)
 (require 'eldoc)
-(require 'ido)
+(require 'ivy)
+(require 'counsel)
+(require 'hydra)
 (require 'dired-x) ; For dired-jump
 (load "cl-seq") ; For the CL «position» and «intersection»
 (eval-and-compile
   (require 'cl) ; Load-time too, for ⌜position⌝ and ⌜intersection⌝ aliases
   (require 'vimizer)) ; For the «silently» macro, and global-set-key-list
-(require 'undo-tree)
-(require 'workgroups)  ; TODO: Switch to workgroups2
+(require 'workgroups)  ; TODO: Switch to workgroups2, but turn off its save/restore so it doesn't conflict with desktop mode.
 (require 'paredit) ; TODO: maybe smartparens instead
 (require 'expand-region) ; TODO: maybe something else
 (require 'highlight-symbol) ; TODO: probably not
 (require 'usablizer)
 (require 'scad)
 (require 'sunrise-commander)
-(require 'sunrise-x-buttons) ; Not compatible with sunrise-x-popviewer
 (require 'sunrise-x-checkpoints)
 (require 'sunrise-x-loop)
 (require 'sunrise-x-mirror)
 (require 'sunrise-x-modeline)
-;;(require 'sunrise-x-popviewer) ; Not compatible with sunrise-x-buttons, according to the docs
+(require 'sunrise-x-popviewer)
 (require 'sunrise-x-tabs)
 (require 'sunrise-x-tree)
+(require 'org)
 
 ;; Silence byte compiler
 (declare-function 'position "cl")
@@ -232,13 +233,11 @@ Show nothing when they're on, to avoid cluttering the mode line."
 (defun maybe-flyspell-buffer ()
   (if flyspell-mode (flyspell-buffer)))
 
-(defun ido-disable-line-trucation () (set (make-local-variable 'truncate-lines) nil))
-
+;; TODO: modify this for Ivy
 ;; The following enables pressing XF86Open twice to create and switch to a new buffer, and S-XF86Open twice to do dired-jump. (Usablizer's related global keybindings enable pressing XF86Open once to open buffer switcher, or S-XF86Open once to open file finder.)
-(defun nicizer-ido-keys () ; Add this to ido-setup-hook
-;;  (define-key ido-completion-map '[XF86Open] 'ido-enter-find-file) ; Don't want after all
-  (define-key ido-completion-map '[XF86Open] 'switch-to-new-buffer)
-  (define-key ido-completion-map '[S-XF86Open] 'dired-jump-from-ido))
+;; (defun nicizer-ido-keys () ; Add this to ido-setup-hook
+;;   (define-key ido-completion-map '[XF86Open] 'switch-to-new-buffer)
+;;   (define-key ido-completion-map '[S-XF86Open] 'dired-jump-from-ido))
 
 ;; By default there's some overlap (file-name-history regexp-search-ring search-ring), so remove it. savehist mode dynamically grows savehist-minibuffer-history-variables, so overlaps must be dynamically removed from desktop-globals-to-save:
 (defun deduplicate-savehist-desktop-vars ()
@@ -659,6 +658,7 @@ This will override the global setting."
   (silently (with-no-warnings
 	      (end-of-buffer arg))))
 
+;; Modify for Ivy, and change comment accordingly, instead of talking about ido.
 (defun switch-to-new-buffer (&optional basename)
   "Create and switch to a new buffer with a name based on BASENAME, or ⌜untitled⌝ if none given.
 Enable `undo-tree-mode' and `whitespace-mode' in the new buffer, and enable auto-save."
@@ -707,6 +707,51 @@ See comments in code for `switch-to-new-buffer' for details."
     (not-presumptuous-copy-region (mark) (point))
     (deactivate-mark)))
 
+;; FIXME: how to implement this?
+;; (defun ivy-switch-buffer-other-window-action-interactive ()
+;;   (interactive)
+;;   (ivy--switch-buffer-other-window-action ""))
+
+;; Can't just use `ivy-partial', since that fails to do `ivy--cd' and maybe other things too. Setting this-command to ivy-partial-or-done works so far as I've tested it (needed because other code assumes it). However, there's an additional code path in ivy-partial-or-done (which is Ivy's standard binding for [tab]) that I'm not sure how to test. Therefore, to be safe, I'm avoiding this simple definition of ivy-partial-not-annoying, and using the more complex one below.
+;; (defun ivy-partial-not-annoying ()
+;;   "Do interactive `ivy-partial' correctly."
+;;   (interactive)
+;;   (setq this-command 'ivy-partial-or-done)
+;;   (ivy-partial))
+
+(defun ivy-partial-not-annoying ()
+  "Do interactive `ivy-partial' correctly."
+  (interactive)
+  (setq this-command 'ivy-partial-or-done)
+  (cl-letf (((symbol-function 'ivy-done) (lambda () ())))
+    (ivy-partial-or-done)))
+
+(defun sr-dired-do-copy-not-annoying (&optional arg)
+  "Do `dired-do-copy' within Sunrise Commander without the latter setting
+the default target directory to that of the opposite pane, since that's the appropriate
+behavior for `sr-do-copy' but not for `dired-do-copy'.
+
+See also `sr-dired-do-rename-not-annoying'."
+  (interactive "P")
+  (setq this-command 'dired-do-copy)
+  (ad-deactivate 'dired-dwim-target-directory)
+  (let ((retval (call-interactively 'dired-do-copy arg)))
+    (ad-activate 'dired-dwim-target-directory)
+    retval))
+
+(defun sr-dired-do-rename-not-annoying (&optional arg)
+  "Do `dired-do-rename' within Sunrise Commander without the latter setting
+the default target directory to that of the opposite pane, since that's the appropriate
+behavior for `sr-do-rename' but not for `dired-do-rename'.
+
+See also `sr-dired-do-copy-not-annoying'."
+  (interactive "P")
+  (setq this-command 'dired-do-rename)
+  (ad-deactivate 'dired-dwim-target-directory)
+  (let ((retval (call-interactively 'dired-do-rename arg)))
+    (ad-activate 'dired-dwim-target-directory)
+    retval))
+
 
 ;;; Init
 
@@ -715,19 +760,19 @@ See comments in code for `switch-to-new-buffer' for details."
   "Hijack the user's keybindings."
   (interactive)
   (global-set-key-list
-   `(([M-S-f14] paredit-mode)
+   `(
 
      ;; Some paredit commands useful even when not in paredit mode
-     ([f14] paredit-forward-slurp-sexp)
-     ([S-f14] paredit-forward-barf-sexp)
      ([f13] paredit-backward-slurp-sexp)
      ([S-f13] paredit-backward-barf-sexp)
-     ([M-f13] paredit-split-sexp)
-     ([M-S-f13] paredit-join-sexps)
+     ([f14] paredit-forward-slurp-sexp)
+     ([S-f14] paredit-forward-barf-sexp)
+     ([M-f13] paredit-join-sexps)
+     ([M-S-f13] paredit-split-sexp)
      ([M-f14] paredit-raise-sexp)
+     ([M-S-f14] paredit-splice-sexp)
      (,(kbd "M-(") paredit-wrap-round)
      (,(kbd "M-[") paredit-wrap-square)
-     (,(kbd "M-)") paredit-splice-sexp)
 
      ;; Miscellaneous
      ([M-menu] text-browse-minor-mode-toggle)
@@ -748,6 +793,8 @@ See comments in code for `switch-to-new-buffer' for details."
      ([s-f23] conlock)
      ([M-S-delete] copy-last-message)
      ([M-find] sunrise)
+     ([M-S-find] sunrise-cd)
+     ([M-C-find] multi-occur-in-matching-buffers)
      ([f7] insert-random-password)
      ([f8] nicizer-reset-stopwatch)
      ([f9] nicizer-read-stopwatch)
@@ -762,8 +809,21 @@ See comments in code for `switch-to-new-buffer' for details."
   (define-key sr-mode-map [XF86Back] 'sr-history-prev)
   (define-key sr-mode-map [XF86Forward] 'sr-history-next)
   (define-key sr-mode-map [S-home] 'sr-beginning-of-buffer)
+  (define-key sr-mode-map [S-end] 'sr-end-of-buffer)
   (define-key sr-mode-map "D" 'dired-do-delete) ; Disregard the unnecessary sr-do-delete
   (define-key sr-mode-map "x" 'dired-do-flagged-delete) ; Disregard the superfluous sr-do-flagged-delete
+  (define-key sr-mode-map "\M-C" 'sr-dired-do-copy-not-annoying)
+  (define-key sr-mode-map "\M-R" 'sr-dired-do-rename-not-annoying)
+
+  (define-key ivy-minibuffer-map [escape] 'minibuffer-keyboard-quit)
+  (define-key ivy-minibuffer-map [return] 'ivy-alt-done) ; Default is 'ivy-done, which opens candidate dir in dired, which is annoying, instead of just completing the candidate.
+  (define-key ivy-minibuffer-map [S-return] 'ivy-immediate-done)
+  (define-key ivy-minibuffer-map [tab] 'ivy-partial-not-annoying)
+  (define-key ivy-minibuffer-map [M-home] 'ivy-beginning-of-buffer)
+  (define-key ivy-minibuffer-map [M-end] 'ivy-end-of-buffer)
+  (define-key ivy-minibuffer-map [M-up] 'ivy-previous-history-element)
+  (define-key ivy-minibuffer-map [M-down] 'ivy-next-history-element)
+  (define-key ivy-minibuffer-map [M-return] 'ivy-switch-buffer-other-window-action-interactive)
 
   ;; Better access to the search history ring
   (advice-add 'isearch-repeat-forward :after
@@ -831,8 +891,10 @@ Many others."
   (put 'narrow-to-region 'disabled nil)
   (unclutter-mode-line) ; To undo this, use: (clutter-mode-line)
   (setq dired-omit-verbose nil) ; Avoid noise in Sunrise Commander
-  (setq sr-use-commander-keys nil) ; Disable redundant keybindings (which also conflict with Usablizer's use of F2 and F3 for uarg-2 and uarg-3)
-  (setq dired-listing-switches "-alD")
+  (setq dired-omit-files "^\\.$\\|^\\.\\.$") ; Only omit dot and dot-dot
+  (setq dired-omit-extensions nil)
+  (customize-set-variable 'sr-use-commander-keys nil) ; Disable redundant keybindings (which also conflict with Usablizer's use of F2 and F3 for uarg-2 and uarg-3). Must use customize-set-variable instead of just setq because of the variable's use of a custom setter.
+  (setq dired-listing-switches "-alD") ; More reliable dired
   (setq sr-listing-switches "-alD")
   (setq sr-traditional-other-window t)
 
@@ -925,16 +987,19 @@ Many others."
   (setq tags-file-name nil)
   (setq tags-table-list '("/usr/local/src/emacs/TAGS" "/usr/local/src/emacs/TAGS-LISP"))
 
-  (ido-mode t)
-  (add-hook 'ido-setup-hook #'nicizer-ido-keys)
-  (setq ido-default-file-method 'selected-window)
-  (setq ido-default-buffer-method 'selected-window)
-  ;; (setq ido-use-virtual-buffers t) ; Don't like after all; when I close a buffer, I want it off my working list
-  (add-hook 'ido-minibuffer-setup-hook #'ido-disable-line-trucation)
-  ;; Copied from http://www.emacswiki.org/cgi-bin/wiki/InteractivelyDoThings
-  ;; But this is still lame; even for long lists, it uses a tiny area (the minibuffer) and makes me scroll a lot, rather than using the full vertical screen space, or the full screen.
-  ;; Display ido results vertically, rather than horizontally
-  (setq ido-decorations (quote ("\n-> " "" "\n   " "\n   ..." "[" "]" " [No match]" " [Matched]" " [Not readable]" " [Too big]" " [Confirm]")))
+  (ivy-mode t)
+  (setq ivy-wrap t)
+  ;; TODO: replace w/ Ivy
+  ;; (ido-mode t)
+  ;; (add-hook 'ido-setup-hook #'nicizer-ido-keys)
+  ;; (setq ido-default-file-method 'selected-window)
+  ;; (setq ido-default-buffer-method 'selected-window)
+  ;; ;; (setq ido-use-virtual-buffers t) ; Don't like after all; when I close a buffer, I want it off my working list
+  ;; (add-hook 'ido-minibuffer-setup-hook #'ido-disable-line-trucation)
+  ;; ;; Copied from http://www.emacswiki.org/cgi-bin/wiki/InteractivelyDoThings
+  ;; ;; But this is still lame; even for long lists, it uses a tiny area (the minibuffer) and makes me scroll a lot, rather than using the full vertical screen space, or the full screen.
+  ;; ;; Display ido results vertically, rather than horizontally
+  ;; (setq ido-decorations (quote ("\n-> " "" "\n   " "\n   ..." "[" "]" " [No match]" " [Matched]" " [Not readable]" " [Too big]" " [Confirm]")))
 
   (eval-and-compile (require 'bookmark+)) ; TODO: Review
   (setq bookmark-default-file (concat user-emacs-directory "bookmarks"))
@@ -1001,15 +1066,17 @@ Many others."
   (keyfreq-autosave-mode)
   (setq keyfreq-autosave-timeout 30)
 
-  (setq ido-save-directory-list-file (concat user-emacs-directory "ido.last"))
+  ;; TODO: replace w/ equivalent for Ivy
+  ;; (setq ido-save-directory-list-file (concat user-emacs-directory "ido.last"))
 
   (add-hook 'post-self-insert-hook #'typing-burst-timer)
   (add-hook 'post-command-hook #'typing-burst-typo-counter)
   (add-hook 'kill-emacs-hook #'dump-typing-burst-history)
 
-  (eval-and-compile (require 'ecomplete))
-  (setq ecomplete-database-file (concat user-emacs-directory "ecompleterc"))
-  (setq message-mail-alias-type 'ecomplete)
+  ;; TODO: replace w/ equivalent for Ivy
+  ;; (eval-and-compile (require 'ecomplete))
+  ;; (setq ecomplete-database-file (concat user-emacs-directory "ecompleterc"))
+  ;; (setq message-mail-alias-type 'ecomplete)
 
   (pushnew 'closed-buffer-history desktop-globals-to-save)
   (pushnew 'closed-buffer-history-max-saved-items desktop-globals-to-save)
