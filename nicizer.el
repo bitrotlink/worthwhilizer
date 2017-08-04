@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.3.8
-;; Package-Requires: ((undo-tree "0.6.5") (vimizer "0.2.6") (usablizer "0.3.6"))
+;; Version: 0.3.9
+;; Package-Requires: ((usablizer "0.3.7"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -752,6 +752,12 @@ See also `sr-dired-do-copy-not-annoying'."
     (ad-activate 'dired-dwim-target-directory)
     retval))
 
+(defun paredit-backward-delete-word ()
+  "Delete a word backward, skipping over any intervening delimiters."
+  (interactive)
+  (cl-letf (((symbol-function 'backward-kill-word) #'backward-delete-word))
+    (paredit-backward-kill-word)))
+
 
 ;;; Init
 
@@ -805,6 +811,8 @@ See also `sr-dired-do-copy-not-annoying'."
      ([M-end] silent-end-of-buffer)))
 
   (nicizer-bind-wg-switch-keys)
+
+  (define-key paredit-mode-map [S-backspace] 'paredit-backward-delete-word)
 
   (define-key sr-mode-map [XF86Back] 'sr-history-prev)
   (define-key sr-mode-map [XF86Forward] 'sr-history-next)
