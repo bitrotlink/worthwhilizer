@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.3.7
+;; Version: 0.4.0
 ;; Package-Requires: ((emacs "25.1") (undo-tree "0.6.6") (vimizer "0.3.0"))
 ;; Keywords: convenience
 
@@ -925,7 +925,8 @@ Use -1 for unlimited, or zero to disable tracking of full items. If this limit i
     ;; Add to head of list
     (pushnew (if (desktop-save-buffer-p buffer-file-name (buffer-name) major-mode)
 		 (cdr (save-current-buffer
-			(desktop-buffer-info (current-buffer))))
+			(let ((desktop-io-file-version (or desktop-io-file-version 208)))
+			  (desktop-buffer-info (current-buffer)))))
 	       buffer-file-name)
 	     closed-buffer-history)
     ;; Truncate excess elements
@@ -998,11 +999,6 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
 
 
 ;;; Init
-
-;; These are essential usability issues, so I'm putting them at top level, not in a function
-(add-hook 'find-file-hook #'register-swap-back)
-(add-hook 'desktop-delay-hook #'add-register-swap-outs t) ; Can't use desktop-after-read-hook for register swap outs since buffers might be lazily restored. Since I'm using desktop-delay-hook, must append, so that the set-marker calls that are added to desktop-delay-hook when desktop-create-buffer runs are run first.
-(add-hook 'kill-buffer-hook #'track-closed-buffer)
 
 ;;;###autoload
 (defun usablizer-bind-keys ()
@@ -1130,7 +1126,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([C-menu] execute-extended-command) ; Using C-menu for execmd key since I'm out of available scancodes
      ([C-S-menu] eval-region-or-last-sexp)
      ([C-M-menu] eval-expression)
-     ([C-M-S-menu] shell-command)
+     ([C-M-S-menu] shell)
      ;; http://www.freebsddiary.org/APC/usb_hid_usages.php calls code 0x79 "Again". Emacs binds it by default to repeat-complex-command, to which it also binds another key it calls "again". So why does it call 0x79 "redo"? XXX: check bindings.
      ([M-redo] kmacro-start-macro-or-insert-counter)
      ([S-redo] kmacro-end-or-call-macro)
@@ -1200,6 +1196,21 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
   ;; But this seems to work just as well:
   (usablizer-fix-minibuffer-maps)
   (usablizer-fix-isearch-map))
+
+;;;###autoload
+(defun usablizer-init-essential ()
+  "Do essential initialization for Emacs usability, to avoid some idiotic data-losing default behavior."
+  (add-hook 'find-file-hook #'register-swap-back)
+  (add-hook 'desktop-delay-hook #'add-register-swap-outs t) ; Can't use desktop-after-read-hook for register swap outs since buffers might be lazily restored. Since I'm using desktop-delay-hook, must append, so that the set-marker calls that are added to desktop-delay-hook when desktop-create-buffer runs are run first.
+  (add-hook 'kill-buffer-hook #'track-closed-buffer))
+
+;;;###autoload
+(defun usablizer-init ()
+  (usablizer-init-essential)
+  (delete-selection-mode)
+  (global-undo-tree-mode))
+
+(usablizer-init)
 
 
 (provide 'usablizer)

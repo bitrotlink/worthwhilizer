@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.3.9
-;; Package-Requires: ((usablizer "0.3.7"))
+;; Version: 0.3.24
+;; Package-Requires: ((usablizer "0.4.0"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -228,16 +228,50 @@ Show nothing when they're on, to avoid cluttering the mode line."
   "Supplement to no-up-down-ring-after-isearch-repeat"
   (remove-up-down-ring))
 
+(defvar ivy--exhibit-first-time nil)
+
+(defun ivy--minibuffer-setup--advice (oldfun)
+  "Inform `ivy--exhibit' when it's called for the first time in this minibuffer
+session, so it knows to behave differently. For use in conjunction
+with `ivy--exhibit--special-first-time'."
+  (setq ivy--exhibit-first-time t)
+  (funcall oldfun))
+
+(defun ivy--exhibit--special-first-time (oldfun)
+  "Advice to go around `ivy--exhibit' to make it behave specially the first time:
+If doing `execute-extended-command', insert the last history element into the
+minibuffer, so pressing enter will immediately operate on it. This enables
+doing M-x [RET] to re-do the last M-x command.
+
+Relies on `ivy--minibuffer-setup--advice'."
+  (if (memq 'ivy--exhibit post-command-hook)
+      (prog1
+	  (funcall oldfun)
+	(when ivy--exhibit-first-time
+	  (setq ivy--exhibit-first-time nil)
+	  (when (memq this-command '(execute-extended-command counsel-M-x))
+	    (ivy-previous-history-element 1)
+	    (with-current-buffer (window-buffer (minibuffer-window))
+	      (move-beginning-of-line 1)
+	      (set-mark (point))
+	      (move-end-of-line 1)
+	      (activate-mark)))))))
+
+;; XXX: delete this; I'm no longer doing anything that causes nil to be passed.
+(defun ivy--done-abort-if-nil (oldfun arg)
+  "Advice to go around `ivy--done', to abort instead of passing nil, since `ivy--done' doesn't handle nil."
+  (if arg
+      (funcall oldfun arg)
+    (minibuffer-keyboard-quit)))
+
+;; Not using, since only works with execute-extended-command, not counsel-M-x.
+;; (advice-add #'ivy--minibuffer-setup :around #'ivy--minibuffer-setup--advice)
+;; (advice-add #'ivy--exhibit :around #'ivy--exhibit--special-first-time)
+
 ;; Add this function to flyspell-mode-hook to flyspell buffer when enabling flyspell mode but not when disabling flyspell mode
 ;; Need this because flyspell-mode runs its hook both when turning on and when turning off
 (defun maybe-flyspell-buffer ()
   (if flyspell-mode (flyspell-buffer)))
-
-;; TODO: modify this for Ivy
-;; The following enables pressing XF86Open twice to create and switch to a new buffer, and S-XF86Open twice to do dired-jump. (Usablizer's related global keybindings enable pressing XF86Open once to open buffer switcher, or S-XF86Open once to open file finder.)
-;; (defun nicizer-ido-keys () ; Add this to ido-setup-hook
-;;   (define-key ido-completion-map '[XF86Open] 'switch-to-new-buffer)
-;;   (define-key ido-completion-map '[S-XF86Open] 'dired-jump-from-ido))
 
 ;; By default there's some overlap (file-name-history regexp-search-ring search-ring), so remove it. savehist mode dynamically grows savehist-minibuffer-history-variables, so overlaps must be dynamically removed from desktop-globals-to-save:
 (defun deduplicate-savehist-desktop-vars ()
@@ -386,6 +420,17 @@ This function copied from and identical to `message-make-date' in Emacs's messag
   "Remove all advices from symbol SYM."
   (interactive "aFunction symbol: ")
   (advice-mapc (lambda (advice _props) (advice-remove sym advice)) sym))
+
+;; For adding to minibuffer-setup-hook
+(defun clear-mark-ring ()
+  (setq mark-ring nil))
+
+;; For adding to post-command-hook
+(defun dedup-mark-ring-head ()
+  "Get rid of dups at head of mark and ring, such as left behind
+by `er/expand-region' after it's cancelled."
+  (while (and (mark-marker) (car mark-ring) (= (mark-marker) (car mark-ring)))
+    (setq mark-ring (cdr mark-ring))))
 
 
 ;;; Fix whitespace-mode brokenness
@@ -658,7 +703,6 @@ This will override the global setting."
   (silently (with-no-warnings
 	      (end-of-buffer arg))))
 
-;; Modify for Ivy, and change comment accordingly, instead of talking about ido.
 (defun switch-to-new-buffer (&optional basename)
   "Create and switch to a new buffer with a name based on BASENAME, or ⌜untitled⌝ if none given.
 Enable `undo-tree-mode' and `whitespace-mode' in the new buffer, and enable auto-save."
@@ -676,21 +720,21 @@ Enable `undo-tree-mode' and `whitespace-mode' in the new buffer, and enable auto
 	      (format (concat user-emacs-directory "untitled/%s")
 		      (buffer-name)))
 	(auto-save-mode))
-      ;; If running from ido, can't just switch to buffer, because aborting recursive edit overrides buffer selection on exit, and I can't just exit-recursive-edit since that'll just accept ido's default and cause ido to override my buffer switch, so I have to switch after aborting. This foobarness is all because I'm putting this function in ido-completion-map so that I can press XF86Open twice to get a new buffer (once is to run ido-switch-buffer), and ido is just so beautifully elegant in the way it handles that.
+      ;; If running from minibuffer-based buffer switcher (e.g. Ido or Ivy), can't just switch to buffer, because aborting recursive edit overrides buffer selection on exit, and I can't just exit-recursive-edit since that'll just accept the minibuffer's default candidate and cause it to override my buffer switch, so I have to switch after aborting. This foobarness is all because I'm putting this function in ivy-mode-map so that I can press XF86Open twice to get a new buffer (once is to run switch-to-new-buffer). I originally wrote this to deal with Ido; now that I've switched to Ivy, it might have a better way to do this, but I haven't checked.
       (if (= (minibuffer-depth) 0) (switch-to-buffer nb)
 	(add-hook 'post-command-hook gross-hack)
 	;; FIXME: messages "Quit", and I don't think I can avoid it without changing the C code.
 	(abort-recursive-edit)))))
 
-;;ido-dired isn't suitable for this, since it doesn't jump to line of current file.
-(defun dired-jump-from-ido ()
-  "`dired-jump', after working around ido awkwardness.
+;; Jump to line of current file in dired.
+(defun dired-jump-from-ivy ()
+  "`dired-jump', and escape minibuffer.
 See comments in code for `switch-to-new-buffer' for details."
   (interactive)
-  (letrec ((gross-hack-dired-ido
+  (letrec ((gross-hack-dired-jump
 	    (lambda () (dired-jump)
-	      (remove-hook 'post-command-hook gross-hack-dired-ido))))
-    (add-hook 'post-command-hook gross-hack-dired-ido)
+	      (remove-hook 'post-command-hook gross-hack-dired-jump))))
+    (add-hook 'post-command-hook gross-hack-dired-jump)
     (abort-recursive-edit)))
 
 (defun conlock ()
@@ -804,6 +848,12 @@ See also `sr-dired-do-copy-not-annoying'."
      ([f7] insert-random-password)
      ([f8] nicizer-reset-stopwatch)
      ([f9] nicizer-read-stopwatch)
+     ([S-XF86Open] counsel-find-file)
+     ([C-menu] counsel-M-x)
+     ([find] swiper)
+     ([S-find] UNUSED)
+     ([M-S-help] counsel-unicode-char)
+     (,(kbd "C-c C-r") 'ivy-resume)
 
      ;; Replace Vimizer and Usablizer bindings to reduce message noise
      ([SunFront] silent-push-mark-command)
@@ -812,6 +862,23 @@ See also `sr-dired-do-copy-not-annoying'."
 
   (nicizer-bind-wg-switch-keys)
 
+  ;; Most of paredit's bindings are annoying, so get rid of them.
+  ;; Patterned on paredit's paredit-define-keys function.
+  (paredit-do-commands (spec keys fn examples)
+      nil
+    (dolist (key keys)
+      (define-key paredit-mode-map (read-kbd-macro key) nil)))
+
+  ;; But keep the plain char ones
+  (mapc (lambda (x) (define-key paredit-mode-map (read-kbd-macro (car x)) (cadr x)))
+	'(("(" paredit-open-round)
+	  (")" paredit-close-round)
+	  ("[" paredit-open-square)
+	  ("]" paredit-close-square)
+	  ("\"" paredit-doublequote)
+	  ("\\" paredit-backslash)
+	  (";" paredit-semicolon)))
+  ;; And the following needed since plain backward-delete-word would screw up paredit mode
   (define-key paredit-mode-map [S-backspace] 'paredit-backward-delete-word)
 
   (define-key sr-mode-map [XF86Back] 'sr-history-prev)
@@ -831,6 +898,9 @@ See also `sr-dired-do-copy-not-annoying'."
   (define-key ivy-minibuffer-map [M-end] 'ivy-end-of-buffer)
   (define-key ivy-minibuffer-map [M-up] 'ivy-previous-history-element)
   (define-key ivy-minibuffer-map [M-down] 'ivy-next-history-element)
+  (define-key ivy-minibuffer-map [find] 'ivy-next-line-or-history)
+  (define-key ivy-minibuffer-map [S-find] 'ivy-reverse-i-search)
+  (define-key ivy-minibuffer-map [remap backward-delete-word] 'ivy-backward-kill-word)
   (define-key ivy-minibuffer-map [M-return] 'ivy-switch-buffer-other-window-action-interactive)
 
   ;; Better access to the search history ring
@@ -885,17 +955,15 @@ Many others."
   (setq scroll-error-top-bottom t)
   (setq isearch-allow-scroll t)
   (setq-default word-wrap t)
-  (column-number-mode)
   (size-indication-mode)
+  (blink-cursor-mode 0)
+  (dynamic-cursor-mode)
+  (column-number-mode)
   (electric-pair-mode)
   (show-paren-mode)
-  (winner-mode)
-  (delete-selection-mode) ; XXX: Really belongs in Usablizer
-  (global-undo-tree-mode) ; XXX: Ditto
-  (dynamic-cursor-mode)
-  (blink-cursor-mode 0)
   (menu-bar-mode 0) ; Permanent menu bar is pointless; use menu-bar-open
   (tool-bar-mode 0)
+  (winner-mode)
   (put 'narrow-to-region 'disabled nil)
   (unclutter-mode-line) ; To undo this, use: (clutter-mode-line)
   (setq dired-omit-verbose nil) ; Avoid noise in Sunrise Commander
@@ -951,6 +1019,8 @@ Many others."
 
   (add-hook 'buffer-face-mode-hook #'set-monospace-mode-lighter)
   (add-hook 'rotate-mark-ring-hook #'track-mark-ring-position) ; See Usablizer
+  (add-hook 'minibuffer-setup-hook 'clear-mark-ring)
+  (add-hook 'post-command-hook #'dedup-mark-ring-head)
   (add-hook 'flyspell-mode-hook #'maybe-flyspell-buffer))
 
 ;;;###autoload
@@ -996,18 +1066,9 @@ Many others."
   (setq tags-table-list '("/usr/local/src/emacs/TAGS" "/usr/local/src/emacs/TAGS-LISP"))
 
   (ivy-mode t)
-  (setq ivy-wrap t)
-  ;; TODO: replace w/ Ivy
-  ;; (ido-mode t)
-  ;; (add-hook 'ido-setup-hook #'nicizer-ido-keys)
-  ;; (setq ido-default-file-method 'selected-window)
-  ;; (setq ido-default-buffer-method 'selected-window)
-  ;; ;; (setq ido-use-virtual-buffers t) ; Don't like after all; when I close a buffer, I want it off my working list
-  ;; (add-hook 'ido-minibuffer-setup-hook #'ido-disable-line-trucation)
-  ;; ;; Copied from http://www.emacswiki.org/cgi-bin/wiki/InteractivelyDoThings
-  ;; ;; But this is still lame; even for long lists, it uses a tiny area (the minibuffer) and makes me scroll a lot, rather than using the full vertical screen space, or the full screen.
-  ;; ;; Display ido results vertically, rather than horizontally
-  ;; (setq ido-decorations (quote ("\n-> " "" "\n   " "\n   ..." "[" "]" " [No match]" " [Matched]" " [Not readable]" " [Too big]" " [Confirm]")))
+  ;; The following enables pressing XF86Open twice to create and switch to a new buffer, and S-XF86Open twice to do dired-jump. (Usablizer's related global keybindings enable pressing XF86Open once to open buffer switcher, or S-XF86Open once to open file finder.)
+  (define-key ivy-minibuffer-map '[XF86Open] 'switch-to-new-buffer)
+  (define-key ivy-minibuffer-map '[S-XF86Open] 'dired-jump-from-ivy)
 
   (eval-and-compile (require 'bookmark+)) ; TODO: Review
   (setq bookmark-default-file (concat user-emacs-directory "bookmarks"))
@@ -1056,6 +1117,15 @@ Many others."
   (fset 'message-make-date 'nicizer-message-make-date-UTC))
 
 ;;;###autoload
+(defun nicizer-init-stateless ()
+  "Initialize all keybindings and features of Vimizer, Usablizer, and Nicizer."
+  (interactive)
+  (usablizer-bind-keys) ; Also calls vimizer-bind-keys
+  (nicizer-bind-keys)
+  (nicizer-init)
+  (nicizer-init-niche))
+
+;;;###autoload
 (defun nicizer-init-stateful ()
   "Initialize recording of Emacs state other than buffer contents."
   (setq savehist-autosave-interval 30)
@@ -1089,16 +1159,6 @@ Many others."
   (pushnew 'closed-buffer-history desktop-globals-to-save)
   (pushnew 'closed-buffer-history-max-saved-items desktop-globals-to-save)
   (pushnew 'closed-buffer-history-max-full-items desktop-globals-to-save))
-
-;;;###autoload
-(defun nicizer-init-all ()
-  "Initialize all keybindings and features of Vimizer, Usablizer, and Nicizer."
-  (interactive)
-  (usablizer-bind-keys) ; Also calls vimizer-bind-keys
-  (nicizer-bind-keys)
-  (nicizer-init)
-  (nicizer-init-niche)
-  (nicizer-init-stateful))
 
 
 (provide 'nicizer)
