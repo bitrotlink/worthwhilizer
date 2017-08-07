@@ -1,5 +1,5 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.3.24
+;; Version: 0.3.26
 ;; Package-Requires: ((usablizer "0.4.0"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -15,7 +15,7 @@
 ;; Nicizer improves a few display, search, and editing settings and features in Emacs. It provides:
 ;;
 ;; 0. An uncluttered modeline.
-;; Minor modes that are normally on (with Nicizer, these include undo-tree-mode, whitespace-mode, and word-wrap in text-mode and prog-mode buffers) have their lighters hidden in the modeline when the modes are on, and have mode-off lighters shown when the modes are off. The latter feature compensates for the former, ensuring that the modeline is never ambiguous about which modes are on.
+;; Minor modes that are normally on (with Nicizer, these include undo-tree-mode, ivy-mode, whitespace-mode, and word-wrap in text-mode and prog-mode buffers) have their lighters hidden in the modeline when the modes are on, and have mode-off lighters shown when the modes are off. The latter feature compensates for the former, ensuring that the modeline is never ambiguous about which modes are on.
 ;;
 ;; 1. Simpler access to the isearch history ring.
 ;; Instead of having to press M-p and M-n to cycle through the history ring, you can just press the up and down arrow keys, like Emacs already lets you do for cycling through various history rings in the minibuffer. Nicizer's special implementation of this feature is necessary because of Emacs's weird isearch implementation, which doesn't start by using the minibuffer even though it looks like it does.
@@ -71,6 +71,7 @@
 (require 'sunrise-x-tabs)
 (require 'sunrise-x-tree)
 (require 'org)
+(require 'mu4e)
 
 ;; Silence byte compiler
 (declare-function 'position "cl")
@@ -111,7 +112,6 @@ Delete all occurrences of ELT from LIST, then push ELT to head of LIST."
 	      " Undo-Tree-off"))) ; In case modeline font doesn't support strikethrough
   "Mode line indicator that `undo-tree-mode' is off.
 In this case either linear undo is on, or undo is disabled entirely.
-
 Less verbose than showing when undo tree is on, if you normally have it on.")
 
 (defvar undo-tree-maybe-lighter
@@ -120,6 +120,20 @@ Less verbose than showing when undo tree is on, if you normally have it on.")
 	      (eval (car (get 'undo-tree-mode-lighter 'standard-value)))
 	    ""))
   "Mode line indicator for `undo-tree-mode'. Silent in major modes in which undo-tree is normally on.")
+
+(defvar ivy-off-lighter
+  '(:eval (if ivy-mode
+	      ""
+	    (if (strikethrough-compatible-font-p)
+		" i̶v̶y̶" ; See comments for undo-tree-off-lighter
+	      " ivy-off")))
+  "Mode line indicator that `ivy-mode' is off.
+Less verbose than showing when it's on, if you normally have it on.")
+
+(defvar ivy-silent-lighter
+  '(:eval "")
+  "Mode line indicator for `ivy-mode'.
+Silent.")
 
 ;; TODO: Getting way too long; invert, and say only text-mode and prog-mode normally have whitespace-mode on.
 (defvar whitespace-mode-normally-off
@@ -151,11 +165,14 @@ The mode is set by `set-line-wrap'.")
 
 (defvar quiet-lighters '(long-lines-lighter
 			 whitespace-mode-off-lighter
-			 undo-tree-off-lighter))
+			 undo-tree-off-lighter
+			 ivy-off-lighter))
 
 ;; Necessary to enable the lighters to work:
 (put 'undo-tree-off-lighter 'risky-local-variable t)
 (put 'undo-tree-maybe-lighter 'risky-local-variable t)
+(put 'ivy-off-lighter 'risky-local-variable t)
+(put 'ivy-silent-lighter 'risky-local-variable t)
 (put 'whitespace-mode-off-lighter 'risky-local-variable t)
 (put 'whitespace-mode-maybe-lighter 'risky-local-variable t)
 (put 'long-lines-lighter 'risky-local-variable t)
@@ -174,10 +191,14 @@ The mode is set by `set-line-wrap'.")
 (defun set-minor-mode-lighter (mode lighter)
   (setcar (cdr (assoc mode minor-mode-alist)) lighter))
 
+(defun get-minor-mode-lighter (mode)
+  (car (cdr (assoc mode minor-mode-alist))))
+
 (defun unclutter-mode-line ()
   "Show when normally-on modes are off.
 Show nothing when they're on, to avoid cluttering the mode line."
   (set-minor-mode-lighter 'undo-tree-mode undo-tree-maybe-lighter)
+  (set-minor-mode-lighter 'ivy-mode ivy-silent-lighter)
   (set-minor-mode-lighter 'whitespace-mode whitespace-mode-maybe-lighter)
   (set-minor-mode-lighter 'global-whitespace-mode "") ; Requires special-casing due to poor design of global-whitespace-mode in Emacs
   (mapc #'delete-from-mode-line quiet-lighters) ; Reset, in case they're already there
@@ -188,6 +209,7 @@ Show nothing when they're on, to avoid cluttering the mode line."
   "Undo `unclutter-mode-line'."
   (set-minor-mode-lighter 'undo-tree-mode
 			  (eval (car (get 'undo-tree-mode-lighter 'standard-value))))
+  (set-minor-mode-lighter 'ivy-mode " ivy")
   (set-minor-mode-lighter 'whitespace-mode " ws") ; Standard value
   (set-minor-mode-lighter 'global-whitespace-mode " WS")
   (mapc #'delete-from-mode-line quiet-lighters)
@@ -448,6 +470,219 @@ This is unlike Emacs's `whitespace-mode' variable, which isn't set by turning on
 
 (advice-add #'whitespace-turn-on :after #'whitespace-turn-on--record-actually-on)
 (advice-add #'whitespace-turn-off :after #'whitespace-turn-off--record-actually-off)
+
+
+;;; Enhance whitespace-mode
+
+;; Adapted from Emacs's whitespace-space defface
+(defface whitespace-space-dups
+  '((((class color) (background dark))
+     :background "grey20"      :foreground "darkgray")
+    (((class color) (background light))
+     :background "orange" :foreground "lightgray")
+    (t :inverse-video t))
+  "Face used to visualize SPACE DUPs."
+  :group 'whitespace)
+
+;; Adapted from Emacs's whitespace-space defvar, despite the obsolescence warning, because whitespace-color-on won't work without it. Yay, Emacs.
+(defvar whitespace-space-dups 'whitespace-space-dups
+  "Symbol face used to visualize SPACE DUPs.
+Used when `whitespace-style' includes the value `space-dups'.")
+(make-obsolete-variable 'whitespace-space-dups "use the face instead." "24.4")
+
+;; Adapted from Emacs's whitespace-space-regexp
+(defcustom whitespace-space-dups-regexp "[^\n\t ]\\( \\{2,3\\}\\)[^\n\t ]"
+  "Specify SPACE DUPs regexp.
+
+Match exactly two or three space chars between non-whitespace chars, because this both is likely a typo or copy/paste artifact and is hard to visually distinguish from a single space. Don't match four or more space chars, because that's likely intentional.
+
+This feature would obviously be distracting for the type of people who prefer to put two spaces after their periods. The solution to that problem is for those people to strive to improve themselves by correcting their preferences. Or they could modify the regex, and continue to wallow in their waywardness...
+
+NOTE: Enclose always by \\\\( and \\\\) the elements to highlight.
+      Use exactly one pair of enclosing \\\\( and \\\\).
+
+Used when `whitespace-style' includes `space-dups'."
+  :type '(regexp :tag "SPACE DUPs")
+  :group 'whitespace)
+
+;; Following 3 setq adapted from whitespace.el, to add space-dups. (Yes, redefining constants here...)
+(setq whitespace-style-value-list
+  '(face
+    tabs
+    spaces
+    space-dups
+    trailing
+    lines
+    lines-tail
+    newline
+    empty
+    indentation
+    indentation::tab
+    indentation::space
+    big-indent
+    space-after-tab
+    space-after-tab::tab
+    space-after-tab::space
+    space-before-tab
+    space-before-tab::tab
+    space-before-tab::space
+    help-newline       ; value used by `whitespace-insert-option-mark'
+    tab-mark
+    space-mark
+    newline-mark
+    ))
+(setq whitespace-toggle-option-alist
+  '((?f    . face)
+    (?t    . tabs)
+    (?s    . spaces)
+    (?d    . space-dups)
+    (?r    . trailing)
+    (?l    . lines)
+    (?L    . lines-tail)
+    (?n    . newline)
+    (?e    . empty)
+    (?\C-i . indentation)
+    (?I    . indentation::tab)
+    (?i    . indentation::space)
+    (?\C-t . big-indent)
+    (?\C-a . space-after-tab)
+    (?A    . space-after-tab::tab)
+    (?a    . space-after-tab::space)
+    (?\C-b . space-before-tab)
+    (?B    . space-before-tab::tab)
+    (?b    . space-before-tab::space)
+    (?T    . tab-mark)
+    (?S    . space-mark)
+    (?N    . newline-mark)
+    (?x    . whitespace-style)
+    ))
+(setq whitespace-report-list
+  (list
+   (cons 'empty                   whitespace-empty-at-bob-regexp)
+   (cons 'empty                   whitespace-empty-at-eob-regexp)
+   (cons 'trailing                whitespace-trailing-regexp)
+   (cons 'space-dups              whitespace-space-dups-regexp)
+   (cons 'indentation             nil)
+   (cons 'indentation::tab        nil)
+   (cons 'indentation::space      nil)
+   (cons 'space-before-tab        whitespace-space-before-tab-regexp)
+   (cons 'space-before-tab::tab   whitespace-space-before-tab-regexp)
+   (cons 'space-before-tab::space whitespace-space-before-tab-regexp)
+   (cons 'space-after-tab         nil)
+   (cons 'space-after-tab::tab    nil)
+   (cons 'space-after-tab::space  nil)
+   ))
+
+;; And have to copy the following entire function (from whitespace.el in Emacs 25.2) just to be able to add two lines of code to it. Wow, Emacs is so easy to customize! :-/
+
+(defun whitespace-color-on ()
+  "Turn on color visualization."
+  (when (whitespace-style-face-p)
+    ;; save current point and refontify when necessary
+    (set (make-local-variable 'whitespace-point)
+         (point))
+    (setq whitespace-point--used
+          (let ((ol (make-overlay (point) (point) nil nil t)))
+            (delete-overlay ol) ol))
+    (set (make-local-variable 'whitespace-font-lock-refontify)
+	 0)
+    (set (make-local-variable 'whitespace-bob-marker)
+	 (point-min-marker))
+    (set (make-local-variable 'whitespace-eob-marker)
+	 (point-max-marker))
+    (set (make-local-variable 'whitespace-buffer-changed)
+	 nil)
+    (add-hook 'post-command-hook #'whitespace-post-command-hook nil t)
+    (add-hook 'before-change-functions #'whitespace-buffer-changed nil t)
+    ;; Add whitespace-mode color into font lock.
+    (setq
+     whitespace-font-lock-keywords
+     `(
+       (whitespace-point--flush-used)
+       ,@(when (memq 'spaces whitespace-active-style)
+           ;; Show SPACEs.
+           `((,whitespace-space-regexp 1 whitespace-space t)
+             ;; Show HARD SPACEs.
+             (,whitespace-hspace-regexp 1 whitespace-hspace t)))
+       ,@(when (memq 'space-dups whitespace-active-style)
+           ;; Show SPACE DUPs.
+           `((,whitespace-space-dups-regexp 1 whitespace-space-dups t)))
+       ,@(when (memq 'tabs whitespace-active-style)
+           ;; Show TABs.
+           `((,whitespace-tab-regexp 1 whitespace-tab t)))
+       ,@(when (memq 'trailing whitespace-active-style)
+           ;; Show trailing blanks.
+           `((,#'whitespace-trailing-regexp 1 whitespace-trailing t)))
+       ,@(when (or (memq 'lines      whitespace-active-style)
+                   (memq 'lines-tail whitespace-active-style))
+           ;; Show "long" lines.
+           `((,(let ((line-column (or whitespace-line-column fill-column)))
+                 (format
+                  "^\\([^\t\n]\\{%s\\}\\|[^\t\n]\\{0,%s\\}\t\\)\\{%d\\}%s\\(.+\\)$"
+                  whitespace-tab-width
+                  (1- whitespace-tab-width)
+                  (/ line-column whitespace-tab-width)
+                  (let ((rem (% line-column whitespace-tab-width)))
+                    (if (zerop rem)
+                        ""
+                      (format ".\\{%d\\}" rem)))))
+              ,(if (memq 'lines whitespace-active-style)
+                   0                    ; whole line
+                 2)                     ; line tail
+              whitespace-line prepend)))
+       ,@(when (or (memq 'space-before-tab whitespace-active-style)
+                   (memq 'space-before-tab::tab whitespace-active-style)
+                   (memq 'space-before-tab::space whitespace-active-style))
+           `((,whitespace-space-before-tab-regexp
+              ,(cond
+                ((memq 'space-before-tab whitespace-active-style)
+                 ;; Show SPACEs before TAB (indent-tabs-mode).
+                 (if whitespace-indent-tabs-mode 1 2))
+                ((memq 'space-before-tab::tab whitespace-active-style)
+                 1)
+                ((memq 'space-before-tab::space whitespace-active-style)
+                 2))
+              whitespace-space-before-tab t)))
+       ,@(when (or (memq 'indentation whitespace-active-style)
+                   (memq 'indentation::tab whitespace-active-style)
+                   (memq 'indentation::space whitespace-active-style))
+           `((,(cond
+                ((memq 'indentation whitespace-active-style)
+                 ;; Show indentation SPACEs (indent-tabs-mode).
+                 (whitespace-indentation-regexp))
+                ((memq 'indentation::tab whitespace-active-style)
+                 ;; Show indentation SPACEs (SPACEs).
+                 (whitespace-indentation-regexp 'tab))
+                ((memq 'indentation::space whitespace-active-style)
+                 ;; Show indentation SPACEs (TABs).
+                 (whitespace-indentation-regexp 'space)))
+              1 whitespace-indentation t)))
+       ,@(when (memq 'big-indent whitespace-active-style)
+           ;; Show big indentation.
+           `((,whitespace-big-indent-regexp 1 'whitespace-big-indent t)))
+       ,@(when (memq 'empty whitespace-active-style)
+           ;; Show empty lines at beginning of buffer.
+           `((,#'whitespace-empty-at-bob-regexp
+              1 whitespace-empty t)
+             ;; Show empty lines at end of buffer.
+             (,#'whitespace-empty-at-eob-regexp
+              1 whitespace-empty t)))
+       ,@(when (or (memq 'space-after-tab whitespace-active-style)
+                   (memq 'space-after-tab::tab whitespace-active-style)
+                   (memq 'space-after-tab::space whitespace-active-style))
+           `((,(cond
+                ((memq 'space-after-tab whitespace-active-style)
+                 ;; Show SPACEs after TAB (indent-tabs-mode).
+                 (whitespace-space-after-tab-regexp))
+                ((memq 'space-after-tab::tab whitespace-active-style)
+                 ;; Show SPACEs after TAB (SPACEs).
+                 (whitespace-space-after-tab-regexp 'tab))
+                ((memq 'space-after-tab::space whitespace-active-style)
+                 ;; Show SPACEs after TAB (TABs).
+                 (whitespace-space-after-tab-regexp 'space)))
+              1 whitespace-space-after-tab t)))))
+    (font-lock-add-keywords nil whitespace-font-lock-keywords t)
+    (font-lock-flush)))
 
 
 ;;; Monospace mode
@@ -852,8 +1087,8 @@ See also `sr-dired-do-copy-not-annoying'."
      ([C-menu] counsel-M-x)
      ([find] swiper)
      ([S-find] UNUSED)
-     ([M-S-help] counsel-unicode-char)
-     (,(kbd "C-c C-r") 'ivy-resume)
+     ([M-help] counsel-unicode-char)
+     (,(kbd "C-c C-r") ivy-resume)
 
      ;; Replace Vimizer and Usablizer bindings to reduce message noise
      ([SunFront] silent-push-mark-command)
@@ -893,6 +1128,7 @@ See also `sr-dired-do-copy-not-annoying'."
   (define-key ivy-minibuffer-map [escape] 'minibuffer-keyboard-quit)
   (define-key ivy-minibuffer-map [return] 'ivy-alt-done) ; Default is 'ivy-done, which opens candidate dir in dired, which is annoying, instead of just completing the candidate.
   (define-key ivy-minibuffer-map [S-return] 'ivy-immediate-done)
+  (define-key ivy-minibuffer-map [M-return] 'ivy-call)
   (define-key ivy-minibuffer-map [tab] 'ivy-partial-not-annoying)
   (define-key ivy-minibuffer-map [M-home] 'ivy-beginning-of-buffer)
   (define-key ivy-minibuffer-map [M-end] 'ivy-end-of-buffer)
@@ -901,7 +1137,6 @@ See also `sr-dired-do-copy-not-annoying'."
   (define-key ivy-minibuffer-map [find] 'ivy-next-line-or-history)
   (define-key ivy-minibuffer-map [S-find] 'ivy-reverse-i-search)
   (define-key ivy-minibuffer-map [remap backward-delete-word] 'ivy-backward-kill-word)
-  (define-key ivy-minibuffer-map [M-return] 'ivy-switch-buffer-other-window-action-interactive)
 
   ;; Better access to the search history ring
   (advice-add 'isearch-repeat-forward :after
@@ -1071,6 +1306,7 @@ Many others."
   (define-key ivy-minibuffer-map '[S-XF86Open] 'dired-jump-from-ivy)
 
   (eval-and-compile (require 'bookmark+)) ; TODO: Review
+  (eval-after-load "info" '(require 'info+)) ; For Info-merge-subnodes
   (setq bookmark-default-file (concat user-emacs-directory "bookmarks"))
   (setq bookmark-save-flag nil)
 
