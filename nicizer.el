@@ -1,5 +1,5 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.3.26
+;; Version: 0.3.29
 ;; Package-Requires: ((usablizer "0.4.0"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -137,7 +137,7 @@ Silent.")
 
 ;; TODO: Getting way too long; invert, and say only text-mode and prog-mode normally have whitespace-mode on.
 (defvar whitespace-mode-normally-off
-  '(help-mode term-mode shell-mode eshell-mode undo-tree-visualizer-mode diff-mode grep-mode occur-mode debugger-mode messages-buffer-mode package-menu-mode Info-mode Man-mode woman-mode ibuffer-mode calc-mode apropos-mode inferior-emacs-lisp-mode completion-list-mode)
+  '(help-mode term-mode shell-mode eshell-mode undo-tree-visualizer-mode diff-mode grep-mode occur-mode debugger-mode messages-buffer-mode package-menu-mode Info-mode Man-mode woman-mode ibuffer-mode calc-mode apropos-mode inferior-emacs-lisp-mode completion-list-mode dired-mode)
   "Major modes in which whitespace mode is not enabled by `global-whitespace-mode'.")
 
 (defvar whitespace-mode-off-lighter
@@ -285,10 +285,6 @@ Relies on `ivy--minibuffer-setup--advice'."
   (if arg
       (funcall oldfun arg)
     (minibuffer-keyboard-quit)))
-
-;; Not using, since only works with execute-extended-command, not counsel-M-x.
-;; (advice-add #'ivy--minibuffer-setup :around #'ivy--minibuffer-setup--advice)
-;; (advice-add #'ivy--exhibit :around #'ivy--exhibit--special-first-time)
 
 ;; Add this function to flyspell-mode-hook to flyspell buffer when enabling flyspell mode but not when disabling flyspell mode
 ;; Need this because flyspell-mode runs its hook both when turning on and when turning off
@@ -454,6 +450,34 @@ by `er/expand-region' after it's cancelled."
   (while (and (mark-marker) (car mark-ring) (= (mark-marker) (car mark-ring)))
     (setq mark-ring (cdr mark-ring))))
 
+(defun counsel-find-file-with-optional-ffap (oldfun &optional arg)
+  "Advice for `counsel-find-file'. With prefix arg, tell that function to use `ffap-guesser' if the latter is successful. Fail with a message if the latter is not successful, to make that immediately obvious."
+  (if (and current-prefix-arg (not (ffap-guesser)))
+      (message "No file at point found")
+    (let ((counsel-find-file-at-point current-prefix-arg)
+	  (arg (if current-prefix-arg nil arg)))
+      (funcall oldfun arg))))
+
+;;Advice to be added to wg-mode-line-add-display
+(defun work-around-incomprehensible-brokenness (oldfun &optional args)
+  "Work around incomprehensible bug when calling `wg-mode-line-add-display', whereby `mode-line-format' is somehow a string property list instead of a list (regular list, satisfying listp) like it's supposed to be."
+  (if (listp mode-line-format)
+      (apply oldfun args)
+    (message "WARNING: mode-line-format is screwed up")))
+
+;; Advice to be added to comint-line-beginning-position
+;; comint-get-old-input-default is broken, returning multiple lines when point is on old field of output text. The docs for it and comint-get-old-input say that if comint-use-prompt-regexp is nil, and point is on output field, then the current (logical) line will be sent as input (though what's really wanted is the line without the leading prompt, which is what the code actually does). But what the actual code does:
+;; 1. The leading prompt (which is in output field), if there is one, is stripped off the logical line (via comint-bol), which is good, but
+;; 2. The entire current field (which can be multiple logical lines) will be sent as input.
+;; 3. The current field might be an output field! Reason it can be an output field is if the entire current logical line is an output field (in which case, comint-bol just does bol, since there's no input field to reach on the current logical line).
+;; Solution: advise comint-line-beginning-position to be careful, and throw an error if its (documented) assumptions are violated.
+
+(defun comint-line-beginning-position-careful (oldfun &optional arg)
+  (let ((retval (funcall oldfun)))
+    (if (get-char-property retval 'field)
+	(user-error "No input field on current line"))
+    retval))
+
 
 ;;; Fix whitespace-mode brokenness
 
@@ -467,9 +491,6 @@ This is unlike Emacs's `whitespace-mode' variable, which isn't set by turning on
 
 (defun whitespace-turn-off--record-actually-off ()
   (setq whitespace-mode-actually-on nil))
-
-(advice-add #'whitespace-turn-on :after #'whitespace-turn-on--record-actually-on)
-(advice-add #'whitespace-turn-off :after #'whitespace-turn-off--record-actually-off)
 
 
 ;;; Enhance whitespace-mode
@@ -1066,7 +1087,7 @@ See also `sr-dired-do-copy-not-annoying'."
      ([S-f10] nicizer-kbd-layout-reset)
      ([M-XF86Save] enable-read-write)
      ([S-XF86Forward] monospace-mode)
-     ([M-XF86Forward] calc)
+     ([M-XF86Forward] UNUSED)
      ([M-S-XF86Forward] zoom-in)
      ([M-XF86Back] zoom-standard)
      ([M-S-XF86Back] zoom-out)
@@ -1077,16 +1098,23 @@ See also `sr-dired-do-copy-not-annoying'."
      ([C-M-f15] mode-specific-command-prefix) ; mdeprfx. FIXME: Emacs's bindings.el does (define-key global-map "\C-c" 'mode-specific-command-prefix), and C-c works, but C-M-f15 doesn't work, at least for winner mode.
      ([s-f23] conlock)
      ([M-S-delete] copy-last-message)
+     ([find] swiper)
+     ([S-find] UNUSED)
      ([M-find] sunrise)
      ([M-S-find] sunrise-cd)
-     ([M-C-find] multi-occur-in-matching-buffers)
+     ([C-find] calc)
+     ([C-S-find] mu4e)
+     ([C-M-find] multi-occur-in-matching-buffers)
+     ([C-M-S-find] rgrep)
+     ([XF86Search] nicizer-toggle-web-window) ; For browsing read-only docs: web, info, help, etc
+     ([S-XF86Search] nicizer-search-web) ; Local desktop and web archive search; remote with uarg
+     ([M-XF86Search] UNUSED)
+     ([M-S-XF86Search] UNUSED)
      ([f7] insert-random-password)
      ([f8] nicizer-reset-stopwatch)
      ([f9] nicizer-read-stopwatch)
      ([S-XF86Open] counsel-find-file)
      ([C-menu] counsel-M-x)
-     ([find] swiper)
-     ([S-find] UNUSED)
      ([M-help] counsel-unicode-char)
      (,(kbd "C-c C-r") ivy-resume)
 
@@ -1136,20 +1164,7 @@ See also `sr-dired-do-copy-not-annoying'."
   (define-key ivy-minibuffer-map [M-down] 'ivy-next-history-element)
   (define-key ivy-minibuffer-map [find] 'ivy-next-line-or-history)
   (define-key ivy-minibuffer-map [S-find] 'ivy-reverse-i-search)
-  (define-key ivy-minibuffer-map [remap backward-delete-word] 'ivy-backward-kill-word)
-
-  ;; Better access to the search history ring
-  (advice-add 'isearch-repeat-forward :after
-	      #'isearch-repeat-forward--remove-up-down-ring)
-  (advice-add 'isearch-repeat-backward :after
-	      #'isearch-repeat-backward--remove-up-down-ring)
-  (advice-add 'isearch-forward-exit-minibuffer :before
-	      #'isearch-forward-exit-minibuffer--remove-up-down-ring)
-  (advice-add 'isearch-reverse-exit-minibuffer :before
-	      #'isearch-forward-exit-minibuffer--remove-up-down-ring)
-  (add-hook 'isearch-mode-hook #'up-down-ring-isearch)
-  ;; To prevent maybe-remove-up-down-ring from being left in post-command-hook
-  (add-hook 'isearch-mode-end-hook #'remove-up-down-ring))
+  (define-key ivy-minibuffer-map [remap backward-delete-word] 'ivy-backward-kill-word))
 
 ;;;###autoload
 (defun nicizer-init ()
@@ -1238,8 +1253,10 @@ Many others."
 ;; Highlight erroneous whitespace
   ;; But if user already customized, then don't override that or turn on globally
   (if (maybe-set 'whitespace-style
-		 '(face empty trailing space-before-tab::tab space-after-tab::tab))
+		 '(face empty trailing space-before-tab::tab space-after-tab::tab space-dups))
       (global-whitespace-mode))
+
+  (setq whitespace-global-modes '(not dired-mode sr-mode))
 
   ;; Use variable-pitch font by default
   (when (string= (face-attribute 'default :family) "DejaVu Sans Mono") ; Don't override user's custom config
@@ -1256,17 +1273,49 @@ Many others."
   (add-hook 'rotate-mark-ring-hook #'track-mark-ring-position) ; See Usablizer
   (add-hook 'minibuffer-setup-hook 'clear-mark-ring)
   (add-hook 'post-command-hook #'dedup-mark-ring-head)
-  (add-hook 'flyspell-mode-hook #'maybe-flyspell-buffer))
+  (add-hook 'flyspell-mode-hook #'maybe-flyspell-buffer)
+
+;; Not using, since only works with execute-extended-command, not counsel-M-x.
+;; (advice-add #'ivy--minibuffer-setup :around #'ivy--minibuffer-setup--advice)
+;; (advice-add #'ivy--exhibit :around #'ivy--exhibit--special-first-time)
+
+  (advice-add #'whitespace-turn-on :after #'whitespace-turn-on--record-actually-on)
+  (advice-add #'whitespace-turn-off :after #'whitespace-turn-off--record-actually-off)
+
+  ;; Better access to the search history ring
+  (advice-add 'isearch-repeat-forward :after
+	      #'isearch-repeat-forward--remove-up-down-ring)
+  (advice-add 'isearch-repeat-backward :after
+	      #'isearch-repeat-backward--remove-up-down-ring)
+  (advice-add 'isearch-forward-exit-minibuffer :before
+	      #'isearch-forward-exit-minibuffer--remove-up-down-ring)
+  (advice-add 'isearch-reverse-exit-minibuffer :before
+	      #'isearch-forward-exit-minibuffer--remove-up-down-ring)
+  (add-hook 'isearch-mode-hook #'up-down-ring-isearch)
+  ;; To prevent maybe-remove-up-down-ring from being left in post-command-hook
+  (add-hook 'isearch-mode-end-hook #'remove-up-down-ring)
+
+  (advice-add 'counsel-find-file :around 'counsel-find-file-with-optional-ffap)
+
+  ;; Bugfix
+  (advice-add 'comint-line-beginning-position :around
+	      'comint-line-beginning-position-careful))
 
 ;;;###autoload
 (defun nicizer-init-niche ()
   "Settings that you probably don't want."
   (remove-hook 'prog-mode-hook 'monospace-mode) ; Remove the sop to the luddites
   (add-find-file-hook-read-only) ; Avoid accidentally modifying stuff
+
   (advice-add 'package-generate-autoloads :before ; autoload-generate-file-autoloads barfs if find-file is hooked to set buffer read-only
 	      #'remove-find-file-hook-read-only)
   (advice-add 'package-generate-autoloads :after ; restore read-only hook to find-file after autoload-generate-file-autoloads is done
 	      #'add-find-file-hook-read-only)
+  (advice-add 'mu4e~draft-open-file :before
+	      #'remove-find-file-hook-read-only) ;avoid more barfage
+  (advice-add 'mu4e~draft-open-file :after
+	      #'add-find-file-hook-read-only) ; and restore after done
+
   (add-hook 'message-mode-hook (lambda () (auto-fill-mode 0))) ; FIXME: insert (at front) hook to message-send-mail-function to check for lines longer than 1000 chars, and offer to do hard word wrap before sending. And test this.
   (setq debug-on-error t)
   (setq eval-expression-print-length nil)
@@ -1332,25 +1381,7 @@ Many others."
   ;; TODO: review these after upgrade to workgroups2, and move to nicizer-init or -stateful.
   (add-hook 'desktop-save-hook #'deduplicate-savehist-desktop-vars)
   (add-hook 'desktop-save-hook #'wg-quiet-update)
-  (add-hook 'desktop-after-read-hook #'conditionally-add-desktop-autosave)
-
-  ;; Outgoing message handling
-  (pushnew '(utf-8 . 8bit) mm-body-charset-encoding-alist) ; Make Emacs stop mangling my messages.
-  (setq message-kill-buffer-on-exit t)
-  (setq message-directory "~/mail/") ; Default is "~/Mail/" (uppercase), which I don't want.
-  (setq message-auto-save-directory ; Re-set because of Emacs bug #19068.
-	(file-name-as-directory (expand-file-name "drafts" message-directory)))
-  (setq message-outbox-directory ; Just to make sure, considering bug #19068.
-	(file-name-as-directory (expand-file-name "outbox" message-directory)))
-  (setq message-queued-drafts-directory ; Just to make sure, considering bug #19068.
-	(file-name-as-directory (expand-file-name "queued-drafts" message-directory)))
-  (mkdir message-auto-save-directory t)
-  (mkdir message-outbox-directory t)
-  (mkdir message-queued-drafts-directory t)
-  (setq message-send-mail-function 'queue-message-to-outbox)
-  (add-hook 'message-sent-hook #'discard-draft)
-  (fset 'message-make-message-id 'nicizer-message-make-message-id)
-  (fset 'message-make-date 'nicizer-message-make-date-UTC))
+  (add-hook 'desktop-after-read-hook #'conditionally-add-desktop-autosave))
 
 ;;;###autoload
 (defun nicizer-init-stateless ()
@@ -1363,6 +1394,8 @@ Many others."
 
 ;;;###autoload
 (defun nicizer-init-stateful ()
+  (advice-add 'wg-mode-line-add-display :around #'work-around-incomprehensible-brokenness) ; FIXME: I don't have even a clue why I have to do this, but workgroups barfs if I don't, due to mode-line-format somehow being screwed up
+
   "Initialize recording of Emacs state other than buffer contents."
   (setq savehist-autosave-interval 30)
   (setq desktop-base-file-name "desktop")
@@ -1394,7 +1427,34 @@ Many others."
 
   (pushnew 'closed-buffer-history desktop-globals-to-save)
   (pushnew 'closed-buffer-history-max-saved-items desktop-globals-to-save)
-  (pushnew 'closed-buffer-history-max-full-items desktop-globals-to-save))
+  (pushnew 'closed-buffer-history-max-full-items desktop-globals-to-save)
+
+  ;; Outgoing message handling
+  (pushnew '(utf-8 . 8bit) mm-body-charset-encoding-alist) ; Make Emacs stop mangling my messages.
+  (setq message-kill-buffer-on-exit t)
+  (setq message-directory "~/mail/") ; Default is "~/Mail/" (uppercase), which I don't want.
+  (setq message-auto-save-directory ; Re-set because of Emacs bug #19068.
+	(file-name-as-directory (expand-file-name "drafts" message-directory)))
+  (setq message-outbox-directory ; Just to make sure, considering bug #19068.
+	(file-name-as-directory (expand-file-name "outbox" message-directory)))
+  (setq message-queued-drafts-directory ; Just to make sure, considering bug #19068.
+	(file-name-as-directory (expand-file-name "queued-drafts" message-directory)))
+  (mkdir message-auto-save-directory t)
+  (mkdir message-outbox-directory t)
+  (mkdir message-queued-drafts-directory t)
+  (setq message-send-mail-function 'queue-message-to-outbox)
+  (add-hook 'message-sent-hook #'discard-draft)
+  (fset 'message-make-message-id 'nicizer-message-make-message-id)
+  (fset 'message-make-date 'nicizer-message-make-date-UTC)
+
+  (setq
+   mu4e-sent-messages-behavior 'delete ; Because I use queue-message-to-outbox instead, then I save from there
+   mu4e-maildir "/m/kd-qubes-share/kd-gandi-Maildir"
+   mu4e-attachment-dir "/m/kd-qubes-share/attachments/"
+   mail-user-agent 'mu4e-user-agent
+   mu4e-compose-hidden-headers nil ; Get rid of some of mu4e's sneaky B.S.
+   mu4e-user-agent-string nil ; And more of it
+   mu4e-index-lazy-check t))
 
 
 (provide 'nicizer)

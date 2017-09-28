@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.4.0
+;; Version: 0.4.1
 ;; Package-Requires: ((emacs "25.1") (undo-tree "0.6.6") (vimizer "0.3.0"))
 ;; Keywords: convenience
 
@@ -1146,9 +1146,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([Scroll_Lock] scroll-lock-mode) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
      ([S-f11] check-parens-and-report)
      ([M-f11] show-paren-mode)
-     ([M-S-f11] goto-next-overlong-line)
-     ([XF86Search] rgrep)
-     ([M-XF86Search] lgrep)))
+     ([M-S-f11] goto-next-overlong-line)))
 
   (mapc
    (lambda (x) (define-key universal-argument-map (car x) (cadr x)))
