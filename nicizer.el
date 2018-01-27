@@ -471,12 +471,65 @@ by `er/expand-region' after it's cancelled."
 ;; 2. The entire current field (which can be multiple logical lines) will be sent as input.
 ;; 3. The current field might be an output field! Reason it can be an output field is if the entire current logical line is an output field (in which case, comint-bol just does bol, since there's no input field to reach on the current logical line).
 ;; Solution: advise comint-line-beginning-position to be careful, and throw an error if its (documented) assumptions are violated.
-
 (defun comint-line-beginning-position-careful (oldfun &optional arg)
   (let ((retval (funcall oldfun)))
     (if (get-char-property retval 'field)
 	(user-error "No input field on current line"))
     retval))
+
+(defun comint-insert-input-not-annoying ()
+  "Do `comint-insert-input', except not annoying. Specifically, allow binding to keystroke, and don't fall back to another command if there's no input field at point."
+  (interactive)
+  (let ((field (field-at-pos (point)))
+	(input (field-string-no-properties (point))))
+    (if (or (null input) (null comint-accum-marker) field)
+	(user-error "Not at input field")
+      (goto-char (point-max))
+      ;; First delete any old unsent input at the end
+      (delete-region
+       (or (marker-position comint-accum-marker)
+	   (process-mark (get-buffer-process (current-buffer))))
+       (point))
+      ;; Insert the input at point
+      (insert input))))
+
+;; Advice for comint-send-input
+(defun comint-send-or-insert-input (oldfun &rest args)
+  "If point is in the input field at the end of the buffer, then do `comint-send-input'.
+Otherwise, do `comint-insert-input-not-annoying', i.e. copy the input field that's under point
+to the end of the buffer, where running this command again (optionally after editing the text)
+will then do `comint-send-input'."
+  (interactive)
+  (if (= (field-end) (point-max))
+      (apply oldfun args)
+    (comint-insert-input-not-annoying)))
+
+(defun overview-interactive-functions (in out)
+  "Print into buffer OUT all defvars, defconsts, defmacros, and definitions of interactive functions in buffer IN, including the docstring, excluding the rest of the body."
+  (let ((item t)
+	(inb (get-buffer in))
+	(outb (get-buffer out)))
+    (unless inb
+      (user-error "No input buffer supplied"))
+    (unless outb
+      (user-error "No output buffer supplied"))
+    (while item
+      (setq item (read inb))
+      (when (consp item)
+	    (when (or (and (equal (car item) 'defun)
+			   (consp (nth 4 item))
+			   (equal (car (nth 4 item)) 'interactive))
+		      (equal (car item) 'defmacro))
+	      (print (list (nth 0 item)
+			   (nth 1 item)
+			   (nth 2 item)
+			   (nth 3 item)
+			   '...) ; Visual reminder that the body is elided
+		     outb))
+	    (when (or (equal (car item) 'defvar)
+		      (equal (car item) 'defvar-local)
+		      (equal (car item) 'defconst))
+	      (print item outb))))))
 
 
 ;;; Fix whitespace-mode brokenness
@@ -1299,7 +1352,10 @@ Many others."
 
   ;; Bugfix
   (advice-add 'comint-line-beginning-position :around
-	      'comint-line-beginning-position-careful))
+	      'comint-line-beginning-position-careful)
+
+  (advice-add 'comint-send-input :around
+	      'comint-send-or-insert-input))
 
 ;;;###autoload
 (defun nicizer-init-niche ()

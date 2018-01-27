@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.4.1
+;; Version: 0.4.2
 ;; Package-Requires: ((emacs "25.1") (undo-tree "0.6.6") (vimizer "0.3.0"))
 ;; Keywords: convenience
 
@@ -1061,7 +1061,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([M-f21] find-char-inclusive)
      ([M-S-f21] backward-find-char-exclusive)
      ([M-S-up] move-to-window-line-top-bottom)
-     ([S-right] recenter-top-bottom)
+     ([C-home] recenter-top-bottom)
 
      ;;Editing commands
      ([S-backspace] backward-delete-word)
@@ -1113,7 +1113,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([M-help] insert-char)
      ([M-S-help] describe-char)
      ([C-M-S-f15] count-words)
-     ([M-S-right] set-line-wrap)
+     ([C-end] set-line-wrap)
      ([f18] universal-argument)
      ([S-f18] universal-argument)
      ([M-f18] negative-argument) ; XXX: M-f18 n where n is a numeral produces the negative, as expected, unless n is 0, in which case it produces -1, due to brain damage in Emacs's universal argument processing (see digit-argument in simple.el)
@@ -1146,7 +1146,9 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([Scroll_Lock] scroll-lock-mode) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
      ([S-f11] check-parens-and-report)
      ([M-f11] show-paren-mode)
-     ([M-S-f11] goto-next-overlong-line)))
+     ([M-S-f11] goto-next-overlong-line)
+     ([M-next] UNUSED) ;; TODO scroll by half window
+     ([M-prior] UNUSED)))
 
   (mapc
    (lambda (x) (define-key universal-argument-map (car x) (cadr x)))
@@ -1193,14 +1195,38 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
   ;; (add-hook 'isearch-mode-hook #'usablizer-fix-isearch-map)
   ;; But this seems to work just as well:
   (usablizer-fix-minibuffer-maps)
-  (usablizer-fix-isearch-map))
+  (usablizer-fix-isearch-map)
+
+  (global-set-key "\C-cl" 'org-store-link)
+  (global-set-key "\C-ca" 'org-agenda)
+  (global-set-key "\C-cc" 'org-capture)
+  (global-set-key "\C-cb" 'org-iswitchb)
+
+  (setq org-disputed-keys
+	'(([(shift up)] . [(meta p)])
+	  ([(shift down)] . [(meta n)])
+	  ([(meta up)] . [(control up)])
+	  ([(meta down)] . [(control down)])
+	  ([(meta shift up)] . [(control meta shift up)])
+	  ([(meta shift down)] . [(control meta shift down)])
+	  ([(control tab)] . [(control meta tab)])
+	  ([(shift return)] . [(control meta return)])
+	  ([(meta shift return)] . [(control meta shift return)])
+	  ([(control shift left)] . [(control p)])
+	  ([(control shift right)] . [(control n)])
+	  ([(control meta shift left)] . [(control -)])
+	  ([(control meta shift right)] . [(control +)])))
+
+  (setq org-replace-disputed-keys t))
 
 ;;;###autoload
 (defun usablizer-init-essential ()
-  "Do essential initialization for Emacs usability, to avoid some idiotic data-losing default behavior."
+  "Do essential initialization for Emacs usability, to avoid some idiotic data-losing default behavior, and accidental data-munging in org-mode."
   (add-hook 'find-file-hook #'register-swap-back)
   (add-hook 'desktop-delay-hook #'add-register-swap-outs t) ; Can't use desktop-after-read-hook for register swap outs since buffers might be lazily restored. Since I'm using desktop-delay-hook, must append, so that the set-marker calls that are added to desktop-delay-hook when desktop-create-buffer runs are run first.
-  (add-hook 'kill-buffer-hook #'track-closed-buffer))
+  (add-hook 'kill-buffer-hook #'track-closed-buffer)
+  (setq org-catch-invisible-edits 'error)
+  (setq org-ctrl-k-protect-subtree 'error))
 
 ;;;###autoload
 (defun usablizer-init ()
