@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.4.3
+;; Version: 0.4.4
 ;; Package-Requires: ((emacs "25.1") (undo-tree "0.6.6") (vimizer "0.3.0"))
 ;; Keywords: convenience
 
@@ -1200,22 +1200,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
   (global-set-key "\C-cl" 'org-store-link)
   (global-set-key "\C-ca" 'org-agenda)
   (global-set-key "\C-cc" 'org-capture)
-  (global-set-key "\C-cb" 'org-iswitchb)
-
-  (setq org-disputed-keys
-	'(([(shift up)] . [(meta p)])
-	  ([(shift down)] . [(meta n)])
-	  ([(meta up)] . [(control up)])
-	  ([(meta down)] . [(control down)])
-	  ([(meta shift up)] . [(control meta shift up)])
-	  ([(meta shift down)] . [(control meta shift down)])
-	  ([(control tab)] . [(control meta tab)])
-	  ([(shift return)] . [(control meta return)])
-	  ([(meta shift return)] . [(control meta shift return)])
-	  ([(control shift left)] . [(control p)])
-	  ([(control shift right)] . [(control n)])
-	  ([(control meta shift left)] . [(control -)])
-	  ([(control meta shift right)] . [(control +)]))))
+  (global-set-key "\C-cb" 'org-iswitchb))
 
 ;;;###autoload
 (defun usablizer-init-essential ()
