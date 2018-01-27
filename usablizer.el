@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.4.2
+;; Version: 0.4.3
 ;; Package-Requires: ((emacs "25.1") (undo-tree "0.6.6") (vimizer "0.3.0"))
 ;; Keywords: convenience
 
@@ -1215,9 +1215,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
 	  ([(control shift left)] . [(control p)])
 	  ([(control shift right)] . [(control n)])
 	  ([(control meta shift left)] . [(control -)])
-	  ([(control meta shift right)] . [(control +)])))
-
-  (setq org-replace-disputed-keys t))
+	  ([(control meta shift right)] . [(control +)]))))
 
 ;;;###autoload
 (defun usablizer-init-essential ()
