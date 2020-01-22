@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.3.29
-;; Package-Requires: ((usablizer "0.4.0"))
+;; Version: 0.3.31
+;; Package-Requires: ((usablizer "0.4.5"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -1122,14 +1122,14 @@ See also `sr-dired-do-copy-not-annoying'."
    `(
 
      ;; Some paredit commands useful even when not in paredit mode
-     ([f13] paredit-backward-slurp-sexp)
-     ([S-f13] paredit-backward-barf-sexp)
-     ([f14] paredit-forward-slurp-sexp)
-     ([S-f14] paredit-forward-barf-sexp)
-     ([M-f13] paredit-join-sexps)
-     ([M-S-f13] paredit-split-sexp)
-     ([M-f14] paredit-raise-sexp)
-     ([M-S-f14] paredit-splice-sexp)
+     ([f14] paredit-backward-slurp-sexp)
+     ([S-f14] paredit-backward-barf-sexp)
+     ([M-f14] paredit-join-sexps)
+     ([M-S-f14] paredit-split-sexp)
+     ([f17] paredit-forward-slurp-sexp)
+     ([S-f17] paredit-forward-barf-sexp)
+     ([M-f17] paredit-raise-sexp)
+     ([M-S-f17] paredit-splice-sexp)
      (,(kbd "M-(") paredit-wrap-round)
      (,(kbd "M-[") paredit-wrap-square)
 
@@ -1138,34 +1138,34 @@ See also `sr-dired-do-copy-not-annoying'."
      ([S-menu] nicizer-kbd-previous-layout)
      ([M-S-menu] nicizer-kbd-switch-layout)
      ([S-f10] nicizer-kbd-layout-reset)
-     ([M-XF86Save] enable-read-write)
+     ([M-XF86Save] UNUSED) ; TODO: display versions of current file
+     ([M-S-XF86Save] UNUSED) ; TODO: display versions of file at point
+     ([M-S-XF86Save] enable-read-write)
      ([S-XF86Forward] monospace-mode)
      ([M-XF86Forward] UNUSED)
      ([M-S-XF86Forward] zoom-in)
      ([M-XF86Back] zoom-standard)
      ([M-S-XF86Back] zoom-out)
-     ([C-SunFront] er/expand-region) ; selsexp key is C-SunFront ; TODO: replace this?
+     ([f16] er/expand-region)
      ([s-S-XF86Open] wg-switch-to-previous-workgroup)
      (,(kbd "s-U") wg-switch-to-previous-workgroup)
-     ([C-S-f15] ,ctl-x-map) ; genprfx. FIXME: C-S-F15 C-t does transpose-lines, as expected, but in calc mode it still tries to do transpose-lines (which doesn't work), instead of calc-transpose-lines that C-x C-t is rebound to. Is calc-mode remapping the keychord instead of the function? And where in the Emacs source code C-x is bound to ctl-x-map?
-     ([C-M-f15] mode-specific-command-prefix) ; mdeprfx. FIXME: Emacs's bindings.el does (define-key global-map "\C-c" 'mode-specific-command-prefix), and C-c works, but C-M-f15 doesn't work, at least for winner mode.
-     ([s-f23] conlock)
+     ([s-cancel] conlock)
      ([M-S-delete] copy-last-message)
      ([find] swiper)
-     ([S-find] UNUSED)
-     ([M-find] sunrise)
+     ([S-find] UNUSED) ; TODO: search backward
+     ([M-find] multi-occur-in-matching-buffers)
      ([M-S-find] sunrise-cd)
-     ([C-find] calc)
-     ([C-S-find] mu4e)
-     ([C-M-find] multi-occur-in-matching-buffers)
-     ([C-M-S-find] rgrep)
+     ([XF86Calculator] calc)
+     ([S-XF86Calculator] mu4e)
+     ([M-S-XF86Calculator] rgrep)
      ([XF86Search] nicizer-toggle-web-window) ; For browsing read-only docs: web, info, help, etc
      ([S-XF86Search] nicizer-search-web) ; Local desktop and web archive search; remote with uarg
      ([M-XF86Search] UNUSED)
      ([M-S-XF86Search] UNUSED)
+     ([f6] goto-line)
      ([f7] insert-random-password)
-     ([f8] nicizer-reset-stopwatch)
-     ([f9] nicizer-read-stopwatch)
+     ([f8] nicizer-read-stopwatch)
+     ([f9] nicizer-reset-stopwatch)
      ([S-XF86Open] counsel-find-file)
      ([C-menu] counsel-M-x)
      ([M-help] counsel-unicode-char)
@@ -1217,7 +1217,13 @@ See also `sr-dired-do-copy-not-annoying'."
   (define-key ivy-minibuffer-map [M-down] 'ivy-next-history-element)
   (define-key ivy-minibuffer-map [find] 'ivy-next-line-or-history)
   (define-key ivy-minibuffer-map [S-find] 'ivy-reverse-i-search)
-  (define-key ivy-minibuffer-map [remap backward-delete-word] 'ivy-backward-kill-word))
+  (define-key ivy-minibuffer-map [remap backward-delete-word] 'ivy-backward-kill-word)
+
+  ;; Get rid of mu4e's infuriating bindings
+  (define-key mu4e-view-mode-map (kbd "<M-down>") nil)
+  (define-key mu4e-view-mode-map (kbd "<M-up>") nil)
+  (define-key mu4e-view-mode-map (kbd "<home>") nil)
+  (define-key mu4e-view-mode-map (kbd "<end>") nil))
 
 ;;;###autoload
 (defun nicizer-init ()
@@ -1276,6 +1282,7 @@ Many others."
   (setq dired-listing-switches "-alD") ; More reliable dired
   (setq sr-listing-switches "-alD")
   (setq sr-traditional-other-window t)
+  (setq windmove-wrap-around t)
 
   ;; Parameterize to enable setting lighter buffer-locally
   (setcar (cdr (assoc 'buffer-face-mode minor-mode-alist))
@@ -1416,7 +1423,7 @@ Many others."
   (setq bookmark-save-flag nil)
 
   ;; TODO: Switch to workgroups2
-  (setq wg-prefix-key '[C-f15])
+  (setq wg-prefix-key '[C-w])
   (workgroups-mode 1) ; TODO: workgroups2 eliminates need to use ⌜1⌝ arg to enable (rather than toggle)?
   (setq wg-morph-on nil)
   (setq wg-query-for-save-on-emacs-exit nil) ; Since I save workgroups as part of desktop instead.

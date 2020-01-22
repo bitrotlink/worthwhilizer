@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.4.4
+;; Version: 0.4.5
 ;; Package-Requires: ((emacs "25.1") (undo-tree "0.6.6") (vimizer "0.3.0"))
 ;; Keywords: convenience
 
@@ -84,6 +84,7 @@
 (require 'desktop) ; Used by Usablizer's closed-buffer tracker
 (require 'undo-tree) ; Emacs isn't usable without it
 (require 'calc) ; So key bindings can be added
+(require 'calc-aent) ; So alternate symbols can be added
 (eval-and-compile (require 'vimizer)) ; For global-set-key-list, vimizer-bind-keys, and the «silently» macro
 (eval-when-compile (require 'cl))
 
@@ -221,6 +222,59 @@ Elements of ALIST that are not conses are ignored."
     (and (> len 1)
 	(eq ?* (string-to-char (substring s 0 1)))
 	(eq ?* (string-to-char (substring s (1- len) len))))))
+
+(defsubst usablizer-calcFunc-third (x)
+  (math-normalize (list '/ x 3)))
+
+(defsubst usablizer-calcFunc-half (x)
+  (math-normalize (list '/ x 2)))
+
+(defsubst usablizer-calcFunc-double (x)
+  (math-normalize (list '* x 2)))
+
+(defsubst usablizer-calcFunc-triple (x)
+  (math-normalize (list '* x 3)))
+
+(defun usablizer-calcFunc-cube-root (x)
+  (math-nth-root x 3))
+
+(defun usablizer-calcFunc-cube (x)
+  (math-pow x 3))
+
+(defun usablizer-calc-third (arg)
+  (interactive "P")
+  (calc-slow-wrapper
+   (calc-unary-op "÷3" 'usablizer-calcFunc-third arg)))
+
+(defun usablizer-calc-half (arg)
+  (interactive "P")
+  (calc-slow-wrapper
+   (calc-unary-op "÷2" 'usablizer-calcFunc-half arg)))
+
+(defun usablizer-calc-double (arg)
+  (interactive "P")
+  (calc-slow-wrapper
+   (calc-unary-op "·2" 'usablizer-calcFunc-double arg)))
+
+(defun usablizer-calc-triple (arg)
+  (interactive "P")
+  (calc-slow-wrapper
+   (calc-unary-op "·3" 'usablizer-calcFunc-triple arg)))
+
+(defun usablizer-calc-sqr (arg)
+  (interactive "P")
+  (calc-slow-wrapper
+   (calc-unary-op "^2" 'calcFunc-sqr arg)))
+
+(defun usablizer-calc-cube-root (arg)
+  (interactive "P")
+  (calc-slow-wrapper
+   (calc-unary-op "cbrt" 'usablizer-calcFunc-cube-root arg)))
+
+(defun usablizer-calc-cube (arg)
+  (interactive "P")
+  (calc-slow-wrapper
+   (calc-unary-op "^3" 'usablizer-calcFunc-cube arg)))
 
 
 ;;; Replace Emacs's point-losing pop-to-mark-command
@@ -506,6 +560,12 @@ Ignores CHAR at point."
   (setq current-prefix-arg (- (prefix-numeric-value arg)))
   (call-interactively #'find-char-exclusive))
 
+(defun moveto-winline-1 (arg)
+  "Do `move-to-window-line-top-bottom' with center as last choice."
+  (interactive "P")
+  (let ((recenter-positions '(top bottom middle)))
+    (call-interactively #'move-to-window-line-top-bottom)))
+
 (defun other-window-back (&optional arg)
   "Same as `other-window', but with negated arg. If no arg, then use -1 by default."
   (interactive "p") (other-window (if arg (- arg) -1)))
@@ -746,6 +806,39 @@ calling the latter interactively, so it will kill without asking."
     (kill-this-buffer)
     (select-window win-curr)))
 
+;; Thanks for this technique goes to jch at:
+;; https://emacs.stackexchange.com/questions/2461/how-can-i-simulate-an-arbitary-key-event-from-elisp
+(defun inject-keyseq (keyseq)
+  (interactive "MKey sequence: ")
+  (setq unread-command-events
+	(listify-key-sequence (kbd keyseq))))
+
+(defvar window-of-last-displayed-buffer nil)
+
+;; Advice for display-buffer
+(defun save-window-of-last-displayed-buffer (x)
+  (setq window-of-last-displayed-buffer x))
+
+(defun quit-popup ()
+  "Type «q» into popped-up window (typically help, occur, messages, backtrace, or undo-tree visualizer) if that will do something other than `self-insert-command'."
+  (interactive)
+  (unless window-of-last-displayed-buffer
+    (user-error "There's no known pop-up"))
+  (with-selected-window window-of-last-displayed-buffer
+    (let ((binding (key-binding "q" t)))
+      (if (or (null binding) (string= binding "self-insert-command"))
+	  (user-error "Last displayed buffer is not quittable"))
+      ;; (inject-keyseq "q") ; Nope; only happens after this command, and thus with-selected-window, already finished
+      (call-interactively binding))
+    (setq window-of-last-displayed-buffer nil)))
+
+(defun dynamic-quit ()
+  "Do whatever C-g is currently bound do, to deal with the Emacs ecosystem's idiotic hard-coding of the quit key."
+  (interactive)
+  (let ((binding (key-binding (kbd "C-g") t)))
+    (setq this-command binding)
+    (call-interactively binding)))
+
 (defun undo-tree-mode-not-enabled ()
   (interactive)
   (user-error "undo-tree-mode not enabled"))
@@ -860,6 +953,28 @@ with names satisfying `earmuffs-p', except *scratch* and *Backtrace*."
 (defun iconify-frame (&optional _dummy)
   "Do nothing. Override Emacs's annoying inbuilt standard function."
   (message "iconify-frame is set to do NOTHING"))
+
+(defun move-window-contents (dir)
+  "Swap buffer in current window with buffer in the window in direction DIR."
+  (let ((win (selected-window))
+	(buf (current-buffer)))
+    (windmove-do-window-select dir)
+    (let ((targetbuf (current-buffer)))
+      (set-window-buffer (selected-window) buf)
+      (with-selected-window win
+	(set-window-buffer (selected-window) targetbuf)))))
+
+(defmacro define-move-window-contents-fn (dir)
+  `(defun
+       ,(intern (format "move-window-contents-%s" (symbol-name dir))) ()
+     (interactive)
+     (move-window-contents ',dir)))
+
+;; (mapc #'define-move-window-contents-fn '(up down left right))
+(define-move-window-contents-fn up)
+(define-move-window-contents-fn down)
+(define-move-window-contents-fn left)
+(define-move-window-contents-fn right)
 
 
 ;;; Special case prefix args 2 and 3 since they're so common, and deserve their own keys without having to press the uarg key before them to initiate numeral entry. 4 is default for uarg, so it already doesn't require pressing an extra key. 5 and higher are infrequent enough that no special casing is needed; requiring uarg command prefix for them is ok.
@@ -1034,21 +1149,21 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-down] next-logical-line)
      ([S-prior] scroll-down-line)
      ([S-next] scroll-up-line)
-     ([f17] forward-to-word)
-     ([f15] reverse-rotate-mark-ring-and-point)
-     ([S-f15] rotate-mark-ring-and-point)
+     ([f23] forward-to-word)
+     ([f19] reverse-rotate-mark-ring-and-point)
+     ([S-f19] rotate-mark-ring-and-point)
      ([C-S-left] uf-backward-sexp) ; Using C-left and C-right for bw_word and end_wrd keys, so I get S-bw_word and S-end_wrd for uf-backward-sexp and uf-forward-sexp
      ([C-S-right] uf-forward-sexp)
-     ([S-f17] forward-to-sexp)
+     ([S-f23] forward-to-sexp)
      ([C-M-S-left] not-weird-beginning-of-defun)
      ([C-M-S-right] not-weird-end-of-defun)
-     ([M-S-f17] forward-to-defun)
+     ([M-S-f23] forward-to-defun)
      ([M-up] not-weird-backward-paragraph)
      ([M-S-down] not-weird-forward-paragraph)
      ([M-down] forward-to-paragraph)
      ([C-M-left] backward-out-list)
      ([C-M-right] out-list)
-     ([M-f17] in-list)
+     ([M-f23] in-list)
      ([S-home] home-list)
      ([S-end] end-list)
      ([M-S-home] beginning-of-visual-line)
@@ -1060,27 +1175,30 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-f21] backward-find-char-inclusive)
      ([M-f21] find-char-inclusive)
      ([M-S-f21] backward-find-char-exclusive)
-     ([M-S-up] move-to-window-line-top-bottom)
-     ([C-home] recenter-top-bottom)
+     ([M-S-up] moveto-winline-1)
+     ([M-S-left] recenter-top-bottom)
+     ([C-home] UNUSED)
 
      ;;Editing commands
      ([S-backspace] backward-delete-word)
      ([S-delete] just-one-space-or-eol)
      ([M-delete] remove-all-text-properties)
      ("\t" completion-at-point) ; TODO: this gets rid of completion window if I use motion command, but not if I press escape. Get rid of it in latter case also. Other options would be hippie-expand or dabbrev-expand, but they don't use a full-window completion buffer like minibuffer-complete does.
-     ([f23] indent-for-tab-command)
-     ([S-f23] insert-tab-command)
-     ([C-f23] indent-sexp-or-region)
-     ([C-S-f23] indent-defun-or-region)
+     ([cancel] indent-for-tab-command)
+     ([S-cancel] insert-tab-command)
+     ([C-cancel] indent-sexp-or-region)
+     ([C-S-cancel] indent-defun-or-region)
      ([S-return] electric-indent-just-newline)
      ([M-return] nl-under)
-     ([M-f22] nl-under)
      ([M-S-return] nl-over)
-     ([M-S-f22] nl-over)
-     ([f16] toggle-letter-case)
-     ([S-f16] ispell-word)
-     ([M-f16] ispell)
-     ([M-S-f16] flyspell-mode-toggle)
+     ;; ([kp-enter] UNUSED) ; TODO: implement fnenter with something like ffap, to follow intra- or inter-document links in text
+     ;; ([S-kp-enter] UNUSED) ; TODO: implement something else useful
+     ([M-kp-enter] nl-under)
+     ([M-S-kp-enter] nl-over)
+     ([f13] toggle-letter-case)
+     ([S-f13] ispell-word)
+     ([M-f13] ispell)
+     ([M-S-f13] flyspell-mode-toggle)
 
      ;; File, buffer, and window management
      ([XF86Open] switch-to-buffer)
@@ -1089,22 +1207,26 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([M-S-XF86Open] bury-buffer)
      ([XF86Close] kill-buffer-no-ask)
      ([S-XF86Close] reopen-buffer)
-     ([M-XF86Close] other-window-kill-buffer)
-     ([s-XF86Close] kill-buffer-and-window)
+     ([M-XF86Close] quit-popup)
+     ([s-XF86Close] delete-window)
+     ([s-S-XF86Close] kill-buffer-and-window)
      ([XF86Save] save-buffer)
      ([S-XF86Save] save-some-buffers)
      ([s-up] windmove-up)
      ([s-down] windmove-down)
      ([s-left] windmove-left)
      ([s-right] windmove-right)
+     ([s-S-up] move-window-contents-up)
+     ([s-S-down] move-window-contents-down)
+     ([s-S-left] move-window-contents-left)
+     ([s-S-right] move-window-contents-right)
      ([C-tab] other-window)
      ([C-S-iso-lefttab] other-window-back) ; Emacs calls S-tab ⌜S-iso-lefttab⌝
      ([s-prior] split-window-vertically)
      ([s-next] delete-other-windows-vertically)
      ([C-s-left] split-window-horizontally)
      ([C-s-right] delete-other-windows-horizontally) ; TODO: implement this
-     ([s-delete] delete-window)
-     ([s-f17] delete-other-windows) ; xmonad uses s-space, not s-f17
+     ([s-f23] delete-other-windows) ; xmonad uses s-space, not s-f23
      ([s-undo] winner-undo) ; TODO: replace by better variant in workgroups2
      ([s-S-undo] winner-redo)
 
@@ -1112,21 +1234,22 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-help] eldoc-mode)
      ([M-help] insert-char)
      ([M-S-help] describe-char)
-     ([C-M-S-f15] count-words)
-     ([C-end] set-line-wrap)
-     ([f18] universal-argument)
-     ([S-f18] universal-argument)
-     ([M-f18] negative-argument) ; XXX: M-f18 n where n is a numeral produces the negative, as expected, unless n is 0, in which case it produces -1, due to brain damage in Emacs's universal argument processing (see digit-argument in simple.el)
-     ([M-S-f18] negative-argument)
+     ([M-S-f18] count-words)
+     ([M-S-right] set-line-wrap)
+     ([C-end] UNUSED)
+     ([f15] universal-argument)
+     ([S-f15] universal-argument)
+     ([M-f15] negative-argument) ; XXX: M-f15 n where n is a numeral produces the negative, as expected, unless n is 0, in which case it produces -1, due to brain damage in Emacs's universal argument processing (see digit-argument in simple.el)
+     ([M-S-f15] negative-argument)
      ([f2] universal-argument-2)
      ([S-f2] universal-argument-2)
      ([f3] universal-argument-3)
      ([S-f3] universal-argument-3)
      ([menu] menu-bar-open)
-     ([C-menu] execute-extended-command) ; Using C-menu for execmd key since I'm out of available scancodes
-     ([C-S-menu] eval-region-or-last-sexp)
-     ([C-M-menu] eval-expression)
-     ([C-M-S-menu] shell)
+     ([SunProps] execute-extended-command)
+     ([S-SunProps] eval-region-or-last-sexp)
+     ([M-SunProps] eval-expression)
+     ([M-S-SunProps] shell)
      ;; http://www.freebsddiary.org/APC/usb_hid_usages.php calls code 0x79 "Again". Emacs binds it by default to repeat-complex-command, to which it also binds another key it calls "again". So why does it call 0x79 "redo"? XXX: check bindings.
      ([M-redo] kmacro-start-macro-or-insert-counter)
      ([S-redo] kmacro-end-or-call-macro)
@@ -1136,24 +1259,24 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([M-undo] undo-tree-mode-not-enabled)
      ([M-S-undo] revert-buffer)
      ([f20] exchange-point-and-mark)
-     ([S-f20] toggle-region-activation) ; I had this as narrow-to-region-tweaked, but I kept accidentally hitting while holding shift to move by lines.
+     ([S-f20] toggle-region-activation)
      ([M-f20] narrow-to-region-tweaked)
      ([M-S-f20] widen)
-     ([f19] jump-to-register)
-     ([S-f19] point-to-register)
-     ([M-f19] list-registers)
+     ([f22] jump-to-register)
+     ([S-f22] point-to-register)
+     ([M-f22] list-registers)
      ;; TODO change scrolling for undo-tree visualizer to use scroll-lock-mode, or at least stop scrolling conservatively. Just setting scroll-conservatively with let binding doesn't work; global value has to be set. Maybe using make-local-variable?
      ([Scroll_Lock] scroll-lock-mode) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
      ([S-f11] check-parens-and-report)
      ([M-f11] show-paren-mode)
      ([M-S-f11] goto-next-overlong-line)
-     ([M-next] UNUSED) ;; TODO scroll by half window
+     ([M-next] UNUSED)
      ([M-prior] UNUSED)))
 
   (mapc
    (lambda (x) (define-key universal-argument-map (car x) (cadr x)))
-   '(([f18] universal-argument-more)
-     ([S-f18] universal-argument-more)
+   '(([f15] universal-argument-more)
+     ([S-f15] universal-argument-more)
      ([f2] universal-argument-more-2)
      ([S-f2] universal-argument-more-2)
      ([f3] universal-argument-more-3)
@@ -1165,16 +1288,39 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
   (define-key calc-mode-map [undo] 'calc-undo)
   (define-key calc-mode-map [S-undo] 'calc-redo)
   (define-key calc-mode-map [XF86Paste] 'calc-yank)
+  ;; Not needed: (define-key calc-dispatch-map "·" 'calc-same-interface)
+  (define-key calc-mode-map "·" 'calc-times)
+  (define-key calc-mode-map "⅓" 'usablizer-calc-third)
+  (define-key calc-mode-map "½" 'usablizer-calc-half)
+  (define-key calc-mode-map "δ" 'usablizer-calc-double)
+  (define-key calc-mode-map "τ" 'usablizer-calc-triple)
+  (define-key calc-mode-map "√" 'calc-sqrt)
+  (define-key calc-mode-map "∛" 'usablizer-calc-cube-root)
+  (define-key calc-mode-map "²" 'usablizer-calc-sqr)
+  (define-key calc-mode-map "³" 'usablizer-calc-cube)
+  (define-key calc-digit-map "·" 'calcDigit-nondigit)
+  (define-key calc-digit-map "⅓" 'calcDigit-nondigit)
+  (define-key calc-digit-map "½" 'calcDigit-nondigit)
+  (define-key calc-digit-map "δ" 'calcDigit-nondigit)
+  (define-key calc-digit-map "τ" 'calcDigit-nondigit)
+  (define-key calc-digit-map "√" 'calcDigit-nondigit)
+  (define-key calc-digit-map "∛" 'calcDigit-nondigit)
+  (define-key calc-digit-map "²" 'calcDigit-nondigit)
+  (define-key calc-digit-map "³" 'calcDigit-nondigit)
+  (push '("·" "*") math-read-replacement-list)
+  (push '("√" "sqrt") math-read-replacement-list)
+  (push '("≠" "!=") math-read-replacement-list)
+
 
 ;;; Emacs: the customizable text editor, in roughly the same way that a brick wall is customizable. If you beat your head against it hard enough, you can actually shove it into a less obstructive form.
 
-  ;;Partially fix the «escape» key
-  ;;FIXME (Emacs inanity): This doesn't cover all the cases. Emacs needs surgery to get rid of all the hardcoded C-g
-  (global-set-key [escape] 'keyboard-quit) ; Default binding of esc key is esc-map, which is ridiculous
-  (global-set-key [S-escape] 'quit-earmuffs) ; Previously was partial-escape
+  ;; This STILL doesn't entirely work. jump-to-register → register-read-with-preview → read-key behaves differently for C-g vs. esc.
+  (global-set-key [escape] 'dynamic-quit) ; Default binding of esc key is esc-map, which is ridiculous
+
+  ;; (global-set-key [S-escape] UNUSED)
   (global-set-key [M-escape] 'not-annoying-keyboard-escape-quit)
   (global-set-key [M-S-escape] esc-map) ; In case esc-map is actually needed for something (unlikely)
-  (define-key undo-tree-visualizer-mode-map [remap keyboard-quit] 'undo-tree-visualizer-quit)
+  (define-key undo-tree-visualizer-mode-map [remap keyboard-quit] 'undo-tree-visualizer-quit) ;; TODO: check if I still need this after changing «escape» from keyboard-quit to dynamic-quit
 
   ;; FIXME: I want to send escape in term mode rather than interpret it in Emacs.
   ;; But the following doesn't work, and I don't know why:
@@ -1209,7 +1355,10 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
   (add-hook 'desktop-delay-hook #'add-register-swap-outs t) ; Can't use desktop-after-read-hook for register swap outs since buffers might be lazily restored. Since I'm using desktop-delay-hook, must append, so that the set-marker calls that are added to desktop-delay-hook when desktop-create-buffer runs are run first.
   (add-hook 'kill-buffer-hook #'track-closed-buffer)
   (setq org-catch-invisible-edits 'error)
-  (setq org-ctrl-k-protect-subtree 'error))
+  (setq org-ctrl-k-protect-subtree 'error)
+
+  ;; Enable quit-popup
+  (advice-add #'display-buffer :filter-return #'save-window-of-last-displayed-buffer))
 
 ;;;###autoload
 (defun usablizer-init ()
