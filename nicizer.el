@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.3.31
-;; Package-Requires: ((usablizer "0.4.5"))
+;; Version: 0.3.33
+;; Package-Requires: ((usablizer "0.4.6"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -1167,7 +1167,7 @@ See also `sr-dired-do-copy-not-annoying'."
      ([f8] nicizer-read-stopwatch)
      ([f9] nicizer-reset-stopwatch)
      ([S-XF86Open] counsel-find-file)
-     ([C-menu] counsel-M-x)
+     ([SunProps] counsel-M-x)
      ([M-help] counsel-unicode-char)
      (,(kbd "C-c C-r") ivy-resume)
 
@@ -1394,6 +1394,7 @@ Many others."
   ;; 90, which has monospace char size 7×15 pixels, proportional size 3-11×15 (width 3 for i and j, 11 for W). (That was measured on 1400×1050 15-inch display; on 1600×1200 15-inch, height is 14 pixels, not 15. Maybe I mis-measured.)
   ;; 83, which has monospace char size 7×14 pixels, proportional size 3-9×15 (width 3 for i and j, 9 for W).
   ;; 75, which is still readable but too small for comfort.
+  (setf (default-value 'line-spacing) 2) ;; Default-default is nil, which means 0, which is too tight
   (set-scroll-bar-mode nil) ; TODO: have (thin) scroll bars, but overlay them with the gutters, rather than put them parallel to the gutters. This avoids wasting space. Use just a lightweight-shaded block for the scroll bar's slider to avoid obscuring the markings shown in the gutters.
   ;; (add-hook 'emacs-lisp-mode-hook #'turn-on-eldoc-mode)
   ;; (add-hook 'lisp-interaction-mode-hook #'turn-on-eldoc-mode)

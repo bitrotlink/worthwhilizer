@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.4.5
+;; Version: 0.4.6
 ;; Package-Requires: ((emacs "25.1") (undo-tree "0.6.6") (vimizer "0.3.0"))
 ;; Keywords: convenience
 
@@ -1290,6 +1290,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
   (define-key calc-mode-map [XF86Paste] 'calc-yank)
   ;; Not needed: (define-key calc-dispatch-map "·" 'calc-same-interface)
   (define-key calc-mode-map "·" 'calc-times)
+  (define-key calc-mode-map "↔" 'calc-inv)
   (define-key calc-mode-map "⅓" 'usablizer-calc-third)
   (define-key calc-mode-map "½" 'usablizer-calc-half)
   (define-key calc-mode-map "δ" 'usablizer-calc-double)
@@ -1299,6 +1300,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
   (define-key calc-mode-map "²" 'usablizer-calc-sqr)
   (define-key calc-mode-map "³" 'usablizer-calc-cube)
   (define-key calc-digit-map "·" 'calcDigit-nondigit)
+  (define-key calc-digit-map "↔" 'calcDigit-nondigit)
   (define-key calc-digit-map "⅓" 'calcDigit-nondigit)
   (define-key calc-digit-map "½" 'calcDigit-nondigit)
   (define-key calc-digit-map "δ" 'calcDigit-nondigit)
