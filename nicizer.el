@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.3.33
-;; Package-Requires: ((usablizer "0.4.6"))
+;; Version: 0.3.34
+;; Package-Requires: ((usablizer "0.4.8"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -1122,14 +1122,14 @@ See also `sr-dired-do-copy-not-annoying'."
    `(
 
      ;; Some paredit commands useful even when not in paredit mode
-     ([f14] paredit-backward-slurp-sexp)
-     ([S-f14] paredit-backward-barf-sexp)
-     ([M-f14] paredit-join-sexps)
-     ([M-S-f14] paredit-split-sexp)
-     ([f17] paredit-forward-slurp-sexp)
-     ([S-f17] paredit-forward-barf-sexp)
-     ([M-f17] paredit-raise-sexp)
-     ([M-S-f17] paredit-splice-sexp)
+     ([f13] paredit-backward-slurp-sexp)
+     ([S-f13] paredit-backward-barf-sexp)
+     ([M-f13] paredit-join-sexps)
+     ([M-S-f13] paredit-split-sexp)
+     ([f16] paredit-forward-slurp-sexp)
+     ([S-f16] paredit-forward-barf-sexp)
+     ([M-f16] paredit-raise-sexp)
+     ([M-S-f16] paredit-splice-sexp)
      (,(kbd "M-(") paredit-wrap-round)
      (,(kbd "M-[") paredit-wrap-square)
 
@@ -1144,12 +1144,12 @@ See also `sr-dired-do-copy-not-annoying'."
      ([S-XF86Forward] monospace-mode)
      ([M-XF86Forward] UNUSED)
      ([M-S-XF86Forward] zoom-in)
-     ([M-XF86Back] zoom-standard)
+     ([M-XF86Back] UNUSED)
+     ([M-S-XF86Favorites] zoom-standard)
      ([M-S-XF86Back] zoom-out)
-     ([f16] er/expand-region)
+     ([f15] er/expand-region)
      ([s-S-XF86Open] wg-switch-to-previous-workgroup)
      (,(kbd "s-U") wg-switch-to-previous-workgroup)
-     ([s-cancel] conlock)
      ([M-S-delete] copy-last-message)
      ([find] swiper)
      ([S-find] UNUSED) ; TODO: search backward

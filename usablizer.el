@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.4.6
+;; Version: 0.4.8
 ;; Package-Requires: ((emacs "25.1") (undo-tree "0.6.6") (vimizer "0.3.0"))
 ;; Keywords: convenience
 
@@ -588,6 +588,18 @@ This is to avoid cluttering the clip ring when deleting typos."
   (let ((indent-tabs-mode t))
     (insert-tab arg)))
 
+(defun unindent (&optional arg)
+  (interactive "P")
+  (let* ((a1 (cond ((consp arg) (car arg))
+		   ((integerp arg) arg)
+		   (t -4)))
+	 (a2 (* a1
+		(if (eq (current-bidi-paragraph-direction) 'right-to-left)
+		    -1 1)))
+	 (beg (if (use-region-p) (region-beginning) (line-beginning-position)))
+	 (end (if (use-region-p) (region-end) (line-end-position))))
+    (indent-rigidly beg end a2)))
+
 (defun indent-sexp-or-region (&optional arg)
   "Indent sexp via `indent-pp-sexp', or indent region rigidly if active.
 With prefix arg, pretty-print."
@@ -1149,21 +1161,21 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-down] next-logical-line)
      ([S-prior] scroll-down-line)
      ([S-next] scroll-up-line)
-     ([f23] forward-to-word)
-     ([f19] reverse-rotate-mark-ring-and-point)
-     ([S-f19] rotate-mark-ring-and-point)
+     ([f22] forward-to-word)
+     ([f18] reverse-rotate-mark-ring-and-point)
+     ([S-f18] rotate-mark-ring-and-point)
      ([C-S-left] uf-backward-sexp) ; Using C-left and C-right for bw_word and end_wrd keys, so I get S-bw_word and S-end_wrd for uf-backward-sexp and uf-forward-sexp
      ([C-S-right] uf-forward-sexp)
-     ([S-f23] forward-to-sexp)
+     ([S-f22] forward-to-sexp)
      ([C-M-S-left] not-weird-beginning-of-defun)
      ([C-M-S-right] not-weird-end-of-defun)
-     ([M-S-f23] forward-to-defun)
+     ([M-S-f22] forward-to-defun)
      ([M-up] not-weird-backward-paragraph)
      ([M-S-down] not-weird-forward-paragraph)
      ([M-down] forward-to-paragraph)
      ([C-M-left] backward-out-list)
      ([C-M-right] out-list)
-     ([M-f23] in-list)
+     ([M-f22] in-list)
      ([S-home] home-list)
      ([S-end] end-list)
      ([M-S-home] beginning-of-visual-line)
@@ -1171,10 +1183,10 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([M-home] beginning-of-buffer)
      ([M-end] end-of-buffer)
      ;; Exclusive forward find-char paired with inclusive backward is intentional
-     ([f21] find-char-exclusive)
-     ([S-f21] backward-find-char-inclusive)
-     ([M-f21] find-char-inclusive)
-     ([M-S-f21] backward-find-char-exclusive)
+     ([f20] find-char-exclusive)
+     ([S-f20] backward-find-char-inclusive)
+     ([M-f20] find-char-inclusive)
+     ([M-S-f20] backward-find-char-exclusive)
      ([M-S-up] moveto-winline-1)
      ([M-S-left] recenter-top-bottom)
      ([C-home] UNUSED)
@@ -1184,21 +1196,22 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-delete] just-one-space-or-eol)
      ([M-delete] remove-all-text-properties)
      ("\t" completion-at-point) ; TODO: this gets rid of completion window if I use motion command, but not if I press escape. Get rid of it in latter case also. Other options would be hippie-expand or dabbrev-expand, but they don't use a full-window completion buffer like minibuffer-complete does.
-     ([cancel] indent-for-tab-command)
-     ([S-cancel] insert-tab-command)
-     ([C-cancel] indent-sexp-or-region)
-     ([C-S-cancel] indent-defun-or-region)
+     ([kp-tab] insert-tab-command)
+     ([f23] indent-for-tab-command)
+     ([S-f23] unindent)
+     ([M-f23] indent-sexp-or-region)
+     ([M-S-f23] indent-defun-or-region)
      ([S-return] electric-indent-just-newline)
      ([M-return] nl-under)
      ([M-S-return] nl-over)
-     ;; ([kp-enter] UNUSED) ; TODO: implement fnenter with something like ffap, to follow intra- or inter-document links in text
-     ;; ([S-kp-enter] UNUSED) ; TODO: implement something else useful
      ([M-kp-enter] nl-under)
      ([M-S-kp-enter] nl-over)
-     ([f13] toggle-letter-case)
-     ([S-f13] ispell-word)
-     ([M-f13] ispell)
-     ([M-S-f13] flyspell-mode-toggle)
+     ;; ([kp-enter] UNUSED) ; TODO: implement fnenter with something like ffap, to follow intra- or inter-document links in text
+     ;; ([S-kp-enter] UNUSED) ; TODO: implement something else useful
+     ([cancel] toggle-letter-case) ; [cancel] (used only because I ran out of scancodes) is «case»
+     ([S-cancel] ispell-word)
+     ([M-cancel] ispell)
+     ([M-S-cancel] flyspell-mode-toggle)
 
      ;; File, buffer, and window management
      ([XF86Open] switch-to-buffer)
@@ -1226,7 +1239,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([s-next] delete-other-windows-vertically)
      ([C-s-left] split-window-horizontally)
      ([C-s-right] delete-other-windows-horizontally) ; TODO: implement this
-     ([s-f23] delete-other-windows) ; xmonad uses s-space, not s-f23
+     ([s-f22] delete-other-windows) ; xmonad uses s-space, not s-f22
      ([s-undo] winner-undo) ; TODO: replace by better variant in workgroups2
      ([s-S-undo] winner-redo)
 
@@ -1234,13 +1247,13 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-help] eldoc-mode)
      ([M-help] insert-char)
      ([M-S-help] describe-char)
-     ([M-S-f18] count-words)
+     ([M-S-f17] count-words)
      ([M-S-right] set-line-wrap)
      ([C-end] UNUSED)
-     ([f15] universal-argument)
-     ([S-f15] universal-argument)
-     ([M-f15] negative-argument) ; XXX: M-f15 n where n is a numeral produces the negative, as expected, unless n is 0, in which case it produces -1, due to brain damage in Emacs's universal argument processing (see digit-argument in simple.el)
-     ([M-S-f15] negative-argument)
+     ([f14] universal-argument)
+     ([S-f14] universal-argument)
+     ([M-f14] negative-argument) ; XXX: M-f14 n where n is a numeral produces the negative, as expected, unless n is 0, in which case it produces -1, due to brain damage in Emacs's universal argument processing (see digit-argument in simple.el)
+     ([M-S-f14] negative-argument)
      ([f2] universal-argument-2)
      ([S-f2] universal-argument-2)
      ([f3] universal-argument-3)
@@ -1258,13 +1271,13 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-undo] undo-tree-mode-not-enabled)
      ([M-undo] undo-tree-mode-not-enabled)
      ([M-S-undo] revert-buffer)
-     ([f20] exchange-point-and-mark)
-     ([S-f20] toggle-region-activation)
-     ([M-f20] narrow-to-region-tweaked)
-     ([M-S-f20] widen)
-     ([f22] jump-to-register)
-     ([S-f22] point-to-register)
-     ([M-f22] list-registers)
+     ([f19] exchange-point-and-mark)
+     ([S-f19] toggle-region-activation)
+     ([M-f19] narrow-to-region-tweaked)
+     ([M-S-f19] widen)
+     ([f21] jump-to-register)
+     ([S-f21] point-to-register)
+     ([M-f21] list-registers)
      ;; TODO change scrolling for undo-tree visualizer to use scroll-lock-mode, or at least stop scrolling conservatively. Just setting scroll-conservatively with let binding doesn't work; global value has to be set. Maybe using make-local-variable?
      ([Scroll_Lock] scroll-lock-mode) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
      ([S-f11] check-parens-and-report)
@@ -1275,8 +1288,8 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
 
   (mapc
    (lambda (x) (define-key universal-argument-map (car x) (cadr x)))
-   '(([f15] universal-argument-more)
-     ([S-f15] universal-argument-more)
+   '(([f14] universal-argument-more)
+     ([S-f14] universal-argument-more)
      ([f2] universal-argument-more-2)
      ([S-f2] universal-argument-more-2)
      ([f3] universal-argument-more-3)
