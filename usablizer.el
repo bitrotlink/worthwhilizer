@@ -1,14 +1,14 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.4.8
-;; Package-Requires: ((emacs "25.1") (undo-tree "0.6.6") (vimizer "0.3.0"))
+;; Version: 0.5.0
+;; Package-Requires: ((emacs "25.1") (undo-tree "0.6.6") (vimizer "0.5.0"))
 ;; Keywords: convenience
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
 ;; or with this file's functions, use:
-;; (set-line-wrap 'off) ; or press M-S-right to cycle to that setting
+;; (set-line-wrap 'off) ; or press s-S-right to cycle to that setting
 ;; To show the long lines, use:
-;; (set-line-wrap 'word) ; or press M-S-right
+;; (set-line-wrap 'word) ; or press s-S-right
 
 
 ;;; Commentary:
@@ -1167,93 +1167,93 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([C-S-left] uf-backward-sexp) ; Using C-left and C-right for bw_word and end_wrd keys, so I get S-bw_word and S-end_wrd for uf-backward-sexp and uf-forward-sexp
      ([C-S-right] uf-forward-sexp)
      ([S-f22] forward-to-sexp)
-     ([C-M-S-left] not-weird-beginning-of-defun)
-     ([C-M-S-right] not-weird-end-of-defun)
-     ([M-S-f22] forward-to-defun)
-     ([M-up] not-weird-backward-paragraph)
-     ([M-S-down] not-weird-forward-paragraph)
-     ([M-down] forward-to-paragraph)
-     ([C-M-left] backward-out-list)
-     ([C-M-right] out-list)
-     ([M-f22] in-list)
+     ([C-s-S-left] not-weird-beginning-of-defun)
+     ([C-s-S-right] not-weird-end-of-defun)
+     ([s-S-f22] forward-to-defun)
+     ([s-up] not-weird-backward-paragraph)
+     ([s-S-down] not-weird-forward-paragraph)
+     ([s-down] forward-to-paragraph)
+     ([C-s-left] backward-out-list)
+     ([C-s-right] out-list)
+     ([s-f22] in-list)
      ([S-home] home-list)
      ([S-end] end-list)
-     ([M-S-home] beginning-of-visual-line)
-     ([M-S-end] end-of-visual-line) ; FIXME (Emacs bug): works if word wrap enabled, but moves one too many chars if char wrap enabled and font is monospace.
-     ([M-home] beginning-of-buffer)
-     ([M-end] end-of-buffer)
+     ([s-S-home] beginning-of-visual-line)
+     ([s-S-end] end-of-visual-line) ; FIXME (Emacs bug): works if word wrap enabled, but moves one too many chars if char wrap enabled and font is monospace.
+     ([s-home] beginning-of-buffer)
+     ([s-end] end-of-buffer)
      ;; Exclusive forward find-char paired with inclusive backward is intentional
      ([f20] find-char-exclusive)
      ([S-f20] backward-find-char-inclusive)
-     ([M-f20] find-char-inclusive)
-     ([M-S-f20] backward-find-char-exclusive)
-     ([M-S-up] moveto-winline-1)
-     ([M-S-left] recenter-top-bottom)
+     ([s-f20] find-char-inclusive)
+     ([s-S-f20] backward-find-char-exclusive)
+     ([s-S-up] moveto-winline-1)
+     ([s-S-left] recenter-top-bottom)
      ([C-home] UNUSED)
 
      ;;Editing commands
      ([S-backspace] backward-delete-word)
      ([S-delete] just-one-space-or-eol)
-     ([M-delete] remove-all-text-properties)
+     ([s-delete] remove-all-text-properties)
      ("\t" completion-at-point) ; TODO: this gets rid of completion window if I use motion command, but not if I press escape. Get rid of it in latter case also. Other options would be hippie-expand or dabbrev-expand, but they don't use a full-window completion buffer like minibuffer-complete does.
      ([kp-tab] insert-tab-command)
      ([f23] indent-for-tab-command)
      ([S-f23] unindent)
-     ([M-f23] indent-sexp-or-region)
-     ([M-S-f23] indent-defun-or-region)
+     ([s-f23] indent-sexp-or-region)
+     ([s-S-f23] indent-defun-or-region)
      ([S-return] electric-indent-just-newline)
-     ([M-return] nl-under)
-     ([M-S-return] nl-over)
-     ([M-kp-enter] nl-under)
-     ([M-S-kp-enter] nl-over)
+     ([s-return] nl-under)
+     ([s-S-return] nl-over)
+     ([s-kp-enter] nl-under)
+     ([s-S-kp-enter] nl-over)
      ;; ([kp-enter] UNUSED) ; TODO: implement fnenter with something like ffap, to follow intra- or inter-document links in text
      ;; ([S-kp-enter] UNUSED) ; TODO: implement something else useful
      ([cancel] toggle-letter-case) ; [cancel] (used only because I ran out of scancodes) is «case»
      ([S-cancel] ispell-word)
-     ([M-cancel] ispell)
-     ([M-S-cancel] flyspell-mode-toggle)
+     ([s-cancel] ispell)
+     ([s-S-cancel] flyspell-mode-toggle)
 
      ;; File, buffer, and window management
      ([XF86Open] switch-to-buffer)
      ([S-XF86Open] find-file)
-     ([M-XF86Open] ibuffer)
-     ([M-S-XF86Open] bury-buffer)
+     ([s-XF86Open] ibuffer)
+     ([s-S-XF86Open] bury-buffer)
      ([XF86Close] kill-buffer-no-ask)
      ([S-XF86Close] reopen-buffer)
-     ([M-XF86Close] quit-popup)
-     ([s-XF86Close] delete-window)
-     ([s-S-XF86Close] kill-buffer-and-window)
+     ([s-XF86Close] quit-popup)
+     ([M-XF86Close] delete-window)
+     ([M-S-XF86Close] kill-buffer-and-window)
      ([XF86Save] save-buffer)
      ([S-XF86Save] save-some-buffers)
-     ([s-up] windmove-up)
-     ([s-down] windmove-down)
-     ([s-left] windmove-left)
-     ([s-right] windmove-right)
-     ([s-S-up] move-window-contents-up)
-     ([s-S-down] move-window-contents-down)
-     ([s-S-left] move-window-contents-left)
-     ([s-S-right] move-window-contents-right)
+     ([M-up] windmove-up)
+     ([M-down] windmove-down)
+     ([M-left] windmove-left)
+     ([M-right] windmove-right)
+     ([M-S-up] move-window-contents-up)
+     ([M-S-down] move-window-contents-down)
+     ([M-S-left] move-window-contents-left)
+     ([M-S-right] move-window-contents-right)
      ([C-tab] other-window)
      ([C-S-iso-lefttab] other-window-back) ; Emacs calls S-tab ⌜S-iso-lefttab⌝
-     ([s-prior] split-window-vertically)
-     ([s-next] delete-other-windows-vertically)
-     ([C-s-left] split-window-horizontally)
-     ([C-s-right] delete-other-windows-horizontally) ; TODO: implement this
-     ([s-f22] delete-other-windows) ; xmonad uses s-space, not s-f22
-     ([s-undo] winner-undo) ; TODO: replace by better variant in workgroups2
-     ([s-S-undo] winner-redo)
+     ([M-prior] split-window-vertically)
+     ([M-next] delete-other-windows-vertically)
+     ([C-M-left] split-window-horizontally)
+     ([C-M-right] delete-other-windows-horizontally) ; TODO: implement this
+     ([M-f22] delete-other-windows) ; xmonad uses M-space, not M-f22
+     ([M-undo] winner-undo) ; TODO: replace by better variant in workgroups2
+     ([M-S-undo] winner-redo)
 
      ;; Miscellaneous
      ([S-help] eldoc-mode)
-     ([M-help] insert-char)
-     ([M-S-help] describe-char)
-     ([M-S-f17] count-words)
-     ([M-S-right] set-line-wrap)
+     ([s-help] insert-char)
+     ([s-S-help] describe-char)
+     ([s-S-f17] count-words)
+     ([s-S-right] set-line-wrap)
      ([C-end] UNUSED)
      ([f14] universal-argument)
      ([S-f14] universal-argument)
-     ([M-f14] negative-argument) ; XXX: M-f14 n where n is a numeral produces the negative, as expected, unless n is 0, in which case it produces -1, due to brain damage in Emacs's universal argument processing (see digit-argument in simple.el)
-     ([M-S-f14] negative-argument)
+     ([s-f14] negative-argument) ; XXX: s-f14 n where n is a numeral produces the negative, as expected, unless n is 0, in which case it produces -1, due to brain damage in Emacs's universal argument processing (see digit-argument in simple.el)
+     ([s-S-f14] negative-argument)
      ([f2] universal-argument-2)
      ([S-f2] universal-argument-2)
      ([f3] universal-argument-3)
@@ -1261,30 +1261,30 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([menu] menu-bar-open)
      ([SunProps] execute-extended-command)
      ([S-SunProps] eval-region-or-last-sexp)
-     ([M-SunProps] eval-expression)
-     ([M-S-SunProps] shell)
+     ([s-SunProps] eval-expression)
+     ([s-S-SunProps] shell)
      ;; http://www.freebsddiary.org/APC/usb_hid_usages.php calls code 0x79 "Again". Emacs binds it by default to repeat-complex-command, to which it also binds another key it calls "again". So why does it call 0x79 "redo"? XXX: check bindings.
-     ([M-redo] kmacro-start-macro-or-insert-counter)
+     ([s-redo] kmacro-start-macro-or-insert-counter)
      ([S-redo] kmacro-end-or-call-macro)
      ;; Disable undo key if undo-tree mode is disabled, to avoid accidentally using Emacs's standard undo without realizing it
      ([undo] undo-tree-mode-not-enabled)
      ([S-undo] undo-tree-mode-not-enabled)
-     ([M-undo] undo-tree-mode-not-enabled)
-     ([M-S-undo] revert-buffer)
+     ([s-undo] undo-tree-mode-not-enabled)
+     ([s-S-undo] revert-buffer)
      ([f19] exchange-point-and-mark)
      ([S-f19] toggle-region-activation)
-     ([M-f19] narrow-to-region-tweaked)
-     ([M-S-f19] widen)
+     ([s-f19] narrow-to-region-tweaked)
+     ([s-S-f19] widen)
      ([f21] jump-to-register)
      ([S-f21] point-to-register)
-     ([M-f21] list-registers)
+     ([s-f21] list-registers)
      ;; TODO change scrolling for undo-tree visualizer to use scroll-lock-mode, or at least stop scrolling conservatively. Just setting scroll-conservatively with let binding doesn't work; global value has to be set. Maybe using make-local-variable?
      ([Scroll_Lock] scroll-lock-mode) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
      ([S-f11] check-parens-and-report)
-     ([M-f11] show-paren-mode)
-     ([M-S-f11] goto-next-overlong-line)
-     ([M-next] UNUSED)
-     ([M-prior] UNUSED)))
+     ([s-f11] show-paren-mode)
+     ([s-S-f11] goto-next-overlong-line)
+     ([s-next] UNUSED)
+     ([s-prior] UNUSED)))
 
   (mapc
    (lambda (x) (define-key universal-argument-map (car x) (cadr x)))
@@ -1297,7 +1297,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
 
   (define-key undo-tree-map [undo] 'undo-tree-undo)
   (define-key undo-tree-map [S-undo] 'undo-tree-redo)
-  (define-key undo-tree-map [M-undo] 'undo-tree-visualize)
+  (define-key undo-tree-map [s-undo] 'undo-tree-visualize)
   (define-key calc-mode-map [undo] 'calc-undo)
   (define-key calc-mode-map [S-undo] 'calc-redo)
   (define-key calc-mode-map [XF86Paste] 'calc-yank)
@@ -1333,8 +1333,8 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
   (global-set-key [escape] 'dynamic-quit) ; Default binding of esc key is esc-map, which is ridiculous
 
   ;; (global-set-key [S-escape] UNUSED)
-  (global-set-key [M-escape] 'not-annoying-keyboard-escape-quit)
-  (global-set-key [M-S-escape] esc-map) ; In case esc-map is actually needed for something (unlikely)
+  (global-set-key [s-escape] 'not-annoying-keyboard-escape-quit)
+  (global-set-key [s-S-escape] esc-map) ; In case esc-map is actually needed for something (unlikely)
   (define-key undo-tree-visualizer-mode-map [remap keyboard-quit] 'undo-tree-visualizer-quit) ;; TODO: check if I still need this after changing «escape» from keyboard-quit to dynamic-quit
 
   ;; FIXME: I want to send escape in term mode rather than interpret it in Emacs.

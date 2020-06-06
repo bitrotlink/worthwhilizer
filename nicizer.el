@@ -1,13 +1,13 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.3.34
-;; Package-Requires: ((usablizer "0.4.8"))
+;; Version: 0.5.1
+;; Package-Requires: ((usablizer "0.5.0"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
 ;; or with Usablizer's functions, use:
-;; (set-line-wrap 'off) ; or press M-S-right to cycle to that setting
+;; (set-line-wrap 'off) ; or press s-S-right to cycle to that setting
 ;; To show the long lines, use:
-;; (set-line-wrap 'word) ; or press M-S-right
+;; (set-line-wrap 'word) ; or press s-S-right
 
 
 ;;; Commentary:
@@ -18,9 +18,9 @@
 ;; Minor modes that are normally on (with Nicizer, these include undo-tree-mode, ivy-mode, whitespace-mode, and word-wrap in text-mode and prog-mode buffers) have their lighters hidden in the modeline when the modes are on, and have mode-off lighters shown when the modes are off. The latter feature compensates for the former, ensuring that the modeline is never ambiguous about which modes are on.
 ;;
 ;; 1. Simpler access to the isearch history ring.
-;; Instead of having to press M-p and M-n to cycle through the history ring, you can just press the up and down arrow keys, like Emacs already lets you do for cycling through various history rings in the minibuffer. Nicizer's special implementation of this feature is necessary because of Emacs's weird isearch implementation, which doesn't start by using the minibuffer even though it looks like it does.
+;; Instead of having to press s-p and s-n to cycle through the history ring, you can just press the up and down arrow keys, like Emacs already lets you do for cycling through various history rings in the minibuffer. Nicizer's special implementation of this feature is necessary because of Emacs's weird isearch implementation, which doesn't start by using the minibuffer even though it looks like it does.
 ;; After you actually do a search in isearch mode (regardless of whether you accessed the history ring), the up/down arrow key access to the history ring is automatically disabled, so you can then press up or down (or any other key for a motion command) to exit isearch mode, as usual.
-;; You can still use M-p and M-n to cycle the ring, and Nicizer's simpler access feature doesn't get in your way if you don't want to use it.
+;; You can still use s-p and s-n to cycle the ring, and Nicizer's simpler access feature doesn't get in your way if you don't want to use it.
 ;;
 ;; 2. A simple text-browse minor mode.
 ;; This is like Emacs's view-mode, except not annoying.
@@ -56,7 +56,7 @@
 (eval-and-compile
   (require 'cl) ; Load-time too, for ⌜position⌝ and ⌜intersection⌝ aliases
   (require 'vimizer)) ; For the «silently» macro, and global-set-key-list
-(require 'workgroups)  ; TODO: Switch to workgroups2, but turn off its save/restore so it doesn't conflict with desktop mode.
+(require 'workgroups) ; TODO: Switch to workgroups2, but turn off its save/restore so it doesn't conflict with desktop mode.
 (require 'paredit) ; TODO: maybe smartparens instead
 (require 'expand-region) ; TODO: maybe something else
 (require 'highlight-symbol) ; TODO: probably not
@@ -216,7 +216,7 @@ Show nothing when they're on, to avoid cluttering the mode line."
   (force-mode-line-update))
 
 (defun up-down-ring-isearch ()
-  "Use up and down arrow keys after isearch to select a search string from the ring. This is more convenient than pressing M-p and M-n. Enable by adding this function to `isearch-mode-hook'."
+  "Use up and down arrow keys after isearch to select a search string from the ring. This is more convenient than pressing s-p and s-n. Enable by adding this function to `isearch-mode-hook'."
   (unless (memq this-command ; Emacs is so gay
 		'(isearch-forward-exit-minibuffer isearch-reverse-exit-minibuffer))
     (define-key isearch-mode-map [down] 'isearch-ring-advance)
@@ -1124,57 +1124,57 @@ See also `sr-dired-do-copy-not-annoying'."
      ;; Some paredit commands useful even when not in paredit mode
      ([f13] paredit-backward-slurp-sexp)
      ([S-f13] paredit-backward-barf-sexp)
-     ([M-f13] paredit-join-sexps)
-     ([M-S-f13] paredit-split-sexp)
+     ([s-f13] paredit-join-sexps)
+     ([s-S-f13] paredit-split-sexp)
      ([f16] paredit-forward-slurp-sexp)
      ([S-f16] paredit-forward-barf-sexp)
-     ([M-f16] paredit-raise-sexp)
-     ([M-S-f16] paredit-splice-sexp)
-     (,(kbd "M-(") paredit-wrap-round)
-     (,(kbd "M-[") paredit-wrap-square)
+     ([s-f16] paredit-raise-sexp)
+     ([s-S-f16] paredit-splice-sexp)
+     (,(kbd "s-(") paredit-wrap-round)
+     (,(kbd "s-[") paredit-wrap-square)
 
      ;; Miscellaneous
-     ([M-menu] text-browse-minor-mode-toggle)
+     ([s-menu] text-browse-minor-mode-toggle)
      ([S-menu] nicizer-kbd-previous-layout)
-     ([M-S-menu] nicizer-kbd-switch-layout)
+     ([s-S-menu] nicizer-kbd-switch-layout)
      ([S-f10] nicizer-kbd-layout-reset)
-     ([M-XF86Save] UNUSED) ; TODO: display versions of current file
-     ([M-S-XF86Save] UNUSED) ; TODO: display versions of file at point
-     ([M-S-XF86Save] enable-read-write)
+     ([s-XF86Save] UNUSED) ; TODO: display versions of current file
+     ([s-S-XF86Save] UNUSED) ; TODO: display versions of file at point
+     ([s-S-XF86Save] enable-read-write)
      ([S-XF86Forward] monospace-mode)
-     ([M-XF86Forward] UNUSED)
-     ([M-S-XF86Forward] zoom-in)
-     ([M-XF86Back] UNUSED)
-     ([M-S-XF86Favorites] zoom-standard)
-     ([M-S-XF86Back] zoom-out)
+     ([s-XF86Forward] UNUSED)
+     ([s-S-XF86Forward] zoom-in)
+     ([s-XF86Back] UNUSED)
+     ([s-S-XF86Favorites] zoom-standard)
+     ([s-S-XF86Back] zoom-out)
      ([f15] er/expand-region)
-     ([s-S-XF86Open] wg-switch-to-previous-workgroup)
-     (,(kbd "s-U") wg-switch-to-previous-workgroup)
-     ([M-S-delete] copy-last-message)
+     ([M-S-XF86Open] wg-switch-to-previous-workgroup)
+     (,(kbd "M-U") wg-switch-to-previous-workgroup)
+     ([s-S-delete] copy-last-message)
      ([find] swiper)
      ([S-find] UNUSED) ; TODO: search backward
-     ([M-find] multi-occur-in-matching-buffers)
-     ([M-S-find] sunrise-cd)
+     ([s-find] multi-occur-in-matching-buffers)
+     ([s-S-find] sunrise-cd)
      ([XF86Calculator] calc)
      ([S-XF86Calculator] mu4e)
-     ([M-S-XF86Calculator] rgrep)
+     ([s-S-XF86Calculator] rgrep)
      ([XF86Search] nicizer-toggle-web-window) ; For browsing read-only docs: web, info, help, etc
      ([S-XF86Search] nicizer-search-web) ; Local desktop and web archive search; remote with uarg
-     ([M-XF86Search] UNUSED)
-     ([M-S-XF86Search] UNUSED)
+     ([s-XF86Search] UNUSED)
+     ([s-S-XF86Search] UNUSED)
      ([f6] goto-line)
      ([f7] insert-random-password)
      ([f8] nicizer-read-stopwatch)
      ([f9] nicizer-reset-stopwatch)
      ([S-XF86Open] counsel-find-file)
      ([SunProps] counsel-M-x)
-     ([M-help] counsel-unicode-char)
+     ([s-help] counsel-unicode-char)
      (,(kbd "C-c C-r") ivy-resume)
 
      ;; Replace Vimizer and Usablizer bindings to reduce message noise
      ([SunFront] silent-push-mark-command)
-     ([M-home] silent-beginning-of-buffer)
-     ([M-end] silent-end-of-buffer)))
+     ([s-home] silent-beginning-of-buffer)
+     ([s-end] silent-end-of-buffer)))
 
   (nicizer-bind-wg-switch-keys)
 
@@ -1203,25 +1203,27 @@ See also `sr-dired-do-copy-not-annoying'."
   (define-key sr-mode-map [S-end] 'sr-end-of-buffer)
   (define-key sr-mode-map "D" 'dired-do-delete) ; Disregard the unnecessary sr-do-delete
   (define-key sr-mode-map "x" 'dired-do-flagged-delete) ; Disregard the superfluous sr-do-flagged-delete
-  (define-key sr-mode-map "\M-C" 'sr-dired-do-copy-not-annoying)
-  (define-key sr-mode-map "\M-R" 'sr-dired-do-rename-not-annoying)
+
+  ;; FIXME: Argh, these worked with \M-C and \M-R, but not \s-C and \s-R.
+  (define-key sr-mode-map "\s-C" 'sr-dired-do-copy-not-annoying)
+  (define-key sr-mode-map "\s-R" 'sr-dired-do-rename-not-annoying)
 
   (define-key ivy-minibuffer-map [escape] 'minibuffer-keyboard-quit)
   (define-key ivy-minibuffer-map [return] 'ivy-alt-done) ; Default is 'ivy-done, which opens candidate dir in dired, which is annoying, instead of just completing the candidate.
   (define-key ivy-minibuffer-map [S-return] 'ivy-immediate-done)
-  (define-key ivy-minibuffer-map [M-return] 'ivy-call)
+  (define-key ivy-minibuffer-map [s-return] 'ivy-call)
   (define-key ivy-minibuffer-map [tab] 'ivy-partial-not-annoying)
-  (define-key ivy-minibuffer-map [M-home] 'ivy-beginning-of-buffer)
-  (define-key ivy-minibuffer-map [M-end] 'ivy-end-of-buffer)
-  (define-key ivy-minibuffer-map [M-up] 'ivy-previous-history-element)
-  (define-key ivy-minibuffer-map [M-down] 'ivy-next-history-element)
+  (define-key ivy-minibuffer-map [s-home] 'ivy-beginning-of-buffer)
+  (define-key ivy-minibuffer-map [s-end] 'ivy-end-of-buffer)
+  (define-key ivy-minibuffer-map [s-up] 'ivy-previous-history-element)
+  (define-key ivy-minibuffer-map [s-down] 'ivy-next-history-element)
   (define-key ivy-minibuffer-map [find] 'ivy-next-line-or-history)
   (define-key ivy-minibuffer-map [S-find] 'ivy-reverse-i-search)
   (define-key ivy-minibuffer-map [remap backward-delete-word] 'ivy-backward-kill-word)
 
   ;; Get rid of mu4e's infuriating bindings
-  (define-key mu4e-view-mode-map (kbd "<M-down>") nil)
-  (define-key mu4e-view-mode-map (kbd "<M-up>") nil)
+  (define-key mu4e-view-mode-map (kbd "<s-down>") nil)
+  (define-key mu4e-view-mode-map (kbd "<s-up>") nil)
   (define-key mu4e-view-mode-map (kbd "<home>") nil)
   (define-key mu4e-view-mode-map (kbd "<end>") nil))
 

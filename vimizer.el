@@ -1,14 +1,14 @@
 ;;; vimizer.el --- Make Emacs's cut/copy/paste more like Vim's -*- lexical-binding: t; -*-
-;; Version: 0.3.0
+;; Version: 0.5.0
 ;; Package-Requires: ((emacs "24.4"))
 ;; Keywords: convenience
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
 ;; or with Usablizer's functions, use:
-;; (set-line-wrap 'off) ; or press M-S-right to cycle to that setting
+;; (set-line-wrap 'off) ; or press s-S-right to cycle to that setting
 ;; To show the long lines, use:
-;; (set-line-wrap 'word) ; or press M-S-right
+;; (set-line-wrap 'word) ; or press s-S-right
 
 
 ;;; Commentary:
@@ -26,10 +26,10 @@
 ;; Paste: paste text from the head of the clip ring. Use a prefix arg to paste the specified number of copies of that text.
 ;; S-Paste: paste text from the head of the clip ring to a new line over the current logical line, regardless of where the cursor currently is on the line, and regardless of whether the pasted text was originally cut or copied as a full line. Because of this, if you press S-Cut followed by S-Paste, the text is cut and then pasted back in the same place, effectively undoing the cut. If you press S-Copy followed by S-Paste, the current logical line is duplicated.
 ;; S-SunFront: enter line-select mode. In this mode, complete logical lines are selected and highlighted, regardless of which commands you use to move the cursor. You can then cut or copy the selected text or do anything else that uses an active region. To cancel the mode, press whatever key or chord you have bound to keyboard-quit (C-g by default in Emacs).
-;; M-Cut, M-Copy, M-S-Cut, or M-S-Copy: do the same as without M, but append the cut or copied text to the end of the text at the head of the clip ring rather than pushing the cut or copied text to a new element on the clip ring.
-;; M-Paste: reverse rotate through the clip ring and replace the last pasted text (this is Emacs's standard yank-pop). Press M-S-Paste to forward rotate. Press s-Paste to paste the primary selection (OS-dependent).
+;; s-Cut, s-Copy, s-S-Cut, or s-S-Copy: do the same as without suplm, but append the cut or copied text to the end of the text at the head of the clip ring rather than pushing the cut or copied text to a new element on the clip ring.
+;; s-Paste: reverse rotate through the clip ring and replace the last pasted text (this is Emacs's standard yank-pop). Press s-S-Paste to forward rotate. Press M-Paste to paste the primary selection (OS-dependent).
 ;; SunFront: enter standard text-select mode (this is Emacs's standard push-mark-command).
-;; M-SunFront: enter rectangle-select mode (Emacs's standard rectangle-mark-mode).
+;; s-SunFront: enter rectangle-select mode (Emacs's standard rectangle-mark-mode).
 ;;
 ;; If you don't have Cut, Copy, Paste, and SunFront keys, or if they're not in convenient locations, then get a better keyboard.
 ;; By the time the Cut, Copy, and Paste keys' names make their way to Emacs on X on Debian Linux (other systems not tried), those names are prefixed with ⌜XF86⌝, so the keybindings in this package use those prefixed names.
@@ -519,21 +519,21 @@ See the Commentary section of vimizer.el for how these work."
      ([XF86Copy] modal-copy)
      ([S-XF86Cut] cutline)
      ([S-XF86Copy] copyline)
-     ([M-XF86Cut] modal-cut-append)
-     ([M-XF86Copy] modal-copy-append)
-     ([M-S-XF86Cut] cutline-append)
-     ([M-S-XF86Copy] copyline-append)
+     ([s-XF86Cut] modal-cut-append)
+     ([s-XF86Copy] modal-copy-append)
+     ([s-S-XF86Cut] cutline-append)
+     ([s-S-XF86Copy] copyline-append)
      ([XF86Paste] not-weird-paste)
      ([S-XF86Paste] paste-over)
-     ([M-XF86Paste] paste-rotate-reverse)
-     ([M-S-XF86Paste] paste-rotate)
-     ([s-XF86Paste] paste-primary)
+     ([s-XF86Paste] paste-rotate-reverse)
+     ([s-S-XF86Paste] paste-rotate)
+     ([M-XF86Paste] paste-primary)
 
      ;; Text-selection commands
      ([SunFront] push-mark-command) ; X calls my setmark key ⌜SunFront⌝
      ([S-SunFront] line-select-minor-mode-enable)
-     ([M-SunFront] rectangle-mark-mode)
-     ([M-S-SunFront] mark-whole-buffer))))
+     ([s-SunFront] rectangle-mark-mode)
+     ([s-S-SunFront] mark-whole-buffer))))
 
 
 (provide 'vimizer)
