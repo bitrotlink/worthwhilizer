@@ -1,5 +1,5 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.5.1
+;; Version: 0.5.4
 ;; Package-Requires: ((usablizer "0.5.0"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -1126,10 +1126,10 @@ See also `sr-dired-do-copy-not-annoying'."
      ([S-f13] paredit-backward-barf-sexp)
      ([s-f13] paredit-join-sexps)
      ([s-S-f13] paredit-split-sexp)
-     ([f16] paredit-forward-slurp-sexp)
-     ([S-f16] paredit-forward-barf-sexp)
-     ([s-f16] paredit-raise-sexp)
-     ([s-S-f16] paredit-splice-sexp)
+     ([f15] paredit-forward-slurp-sexp)
+     ([S-f15] paredit-forward-barf-sexp)
+     ([s-f15] paredit-raise-sexp)
+     ([s-S-f15] paredit-splice-sexp)
      (,(kbd "s-(") paredit-wrap-round)
      (,(kbd "s-[") paredit-wrap-square)
 
@@ -1141,13 +1141,16 @@ See also `sr-dired-do-copy-not-annoying'."
      ([s-XF86Save] UNUSED) ; TODO: display versions of current file
      ([s-S-XF86Save] UNUSED) ; TODO: display versions of file at point
      ([s-S-XF86Save] enable-read-write)
+     ([s-XF86Back] UNUSED)
+     ([s-S-XF86Back] UNUSED)
      ([S-XF86Forward] monospace-mode)
      ([s-XF86Forward] UNUSED)
-     ([s-S-XF86Forward] zoom-in)
-     ([s-XF86Back] UNUSED)
-     ([s-S-XF86Favorites] zoom-standard)
-     ([s-S-XF86Back] zoom-out)
-     ([f15] er/expand-region)
+     ([s-S-XF86Forward] UNUSED)
+     ([s-S-F22] UNUSED)
+     ([M-S-home] zoom-out)
+     ([M-S-next] zoom-standard)
+     ([M-S-end] zoom-in)
+     ([f22] er/expand-region)
      ([M-S-XF86Open] wg-switch-to-previous-workgroup)
      (,(kbd "M-U") wg-switch-to-previous-workgroup)
      ([s-S-delete] copy-last-message)
@@ -1156,8 +1159,7 @@ See also `sr-dired-do-copy-not-annoying'."
      ([s-find] multi-occur-in-matching-buffers)
      ([s-S-find] sunrise-cd)
      ([XF86Calculator] calc)
-     ([S-XF86Calculator] mu4e)
-     ([s-S-XF86Calculator] rgrep)
+     ([s-XF86Favorites] mu4e)
      ([XF86Search] nicizer-toggle-web-window) ; For browsing read-only docs: web, info, help, etc
      ([S-XF86Search] nicizer-search-web) ; Local desktop and web archive search; remote with uarg
      ([s-XF86Search] UNUSED)
@@ -1205,8 +1207,8 @@ See also `sr-dired-do-copy-not-annoying'."
   (define-key sr-mode-map "x" 'dired-do-flagged-delete) ; Disregard the superfluous sr-do-flagged-delete
 
   ;; FIXME: Argh, these worked with \M-C and \M-R, but not \s-C and \s-R.
-  (define-key sr-mode-map "\s-C" 'sr-dired-do-copy-not-annoying)
-  (define-key sr-mode-map "\s-R" 'sr-dired-do-rename-not-annoying)
+  ;; (define-key sr-mode-map "\s-C" 'sr-dired-do-copy-not-annoying)
+  ;; (define-key sr-mode-map "\s-R" 'sr-dired-do-rename-not-annoying)
 
   (define-key ivy-minibuffer-map [escape] 'minibuffer-keyboard-quit)
   (define-key ivy-minibuffer-map [return] 'ivy-alt-done) ; Default is 'ivy-done, which opens candidate dir in dired, which is annoying, instead of just completing the candidate.

@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.5.0
+;; Version: 0.5.1
 ;; Package-Requires: ((emacs "25.1") (undo-tree "0.6.6") (vimizer "0.5.0"))
 ;; Keywords: convenience
 
@@ -1161,21 +1161,21 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-down] next-logical-line)
      ([S-prior] scroll-down-line)
      ([S-next] scroll-up-line)
-     ([f22] forward-to-word)
-     ([f18] reverse-rotate-mark-ring-and-point)
-     ([S-f18] rotate-mark-ring-and-point)
+     ([f21] forward-to-word)
+     ([f17] reverse-rotate-mark-ring-and-point)
+     ([S-f17] rotate-mark-ring-and-point)
      ([C-S-left] uf-backward-sexp) ; Using C-left and C-right for bw_word and end_wrd keys, so I get S-bw_word and S-end_wrd for uf-backward-sexp and uf-forward-sexp
      ([C-S-right] uf-forward-sexp)
-     ([S-f22] forward-to-sexp)
+     ([S-f21] forward-to-sexp)
      ([C-s-S-left] not-weird-beginning-of-defun)
      ([C-s-S-right] not-weird-end-of-defun)
-     ([s-S-f22] forward-to-defun)
+     ([s-S-f21] forward-to-defun)
      ([s-up] not-weird-backward-paragraph)
      ([s-S-down] not-weird-forward-paragraph)
      ([s-down] forward-to-paragraph)
      ([C-s-left] backward-out-list)
      ([C-s-right] out-list)
-     ([s-f22] in-list)
+     ([s-f21] in-list)
      ([S-home] home-list)
      ([S-end] end-list)
      ([s-S-home] beginning-of-visual-line)
@@ -1183,10 +1183,10 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([s-home] beginning-of-buffer)
      ([s-end] end-of-buffer)
      ;; Exclusive forward find-char paired with inclusive backward is intentional
-     ([f20] find-char-exclusive)
-     ([S-f20] backward-find-char-inclusive)
-     ([s-f20] find-char-inclusive)
-     ([s-S-f20] backward-find-char-exclusive)
+     ([f19] find-char-exclusive)
+     ([S-f19] backward-find-char-inclusive)
+     ([s-f19] find-char-inclusive)
+     ([s-S-f19] backward-find-char-exclusive)
      ([s-S-up] moveto-winline-1)
      ([s-S-left] recenter-top-bottom)
      ([C-home] UNUSED)
@@ -1239,7 +1239,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([M-next] delete-other-windows-vertically)
      ([C-M-left] split-window-horizontally)
      ([C-M-right] delete-other-windows-horizontally) ; TODO: implement this
-     ([M-f22] delete-other-windows) ; xmonad uses M-space, not M-f22
+     ([M-f21] delete-other-windows) ; xmonad uses M-space, not M-f21
      ([M-undo] winner-undo) ; TODO: replace by better variant in workgroups2
      ([M-S-undo] winner-redo)
 
@@ -1247,7 +1247,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-help] eldoc-mode)
      ([s-help] insert-char)
      ([s-S-help] describe-char)
-     ([s-S-f17] count-words)
+     ([s-S-f16] count-words)
      ([s-S-right] set-line-wrap)
      ([C-end] UNUSED)
      ([f14] universal-argument)
@@ -1271,13 +1271,13 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-undo] undo-tree-mode-not-enabled)
      ([s-undo] undo-tree-mode-not-enabled)
      ([s-S-undo] revert-buffer)
-     ([f19] exchange-point-and-mark)
-     ([S-f19] toggle-region-activation)
-     ([s-f19] narrow-to-region-tweaked)
-     ([s-S-f19] widen)
-     ([f21] jump-to-register)
-     ([S-f21] point-to-register)
-     ([s-f21] list-registers)
+     ([f18] exchange-point-and-mark)
+     ([S-f18] toggle-region-activation)
+     ([s-f18] narrow-to-region-tweaked)
+     ([s-S-f18] widen)
+     ([f20] jump-to-register)
+     ([S-f20] point-to-register)
+     ([s-f20] list-registers)
      ;; TODO change scrolling for undo-tree visualizer to use scroll-lock-mode, or at least stop scrolling conservatively. Just setting scroll-conservatively with let binding doesn't work; global value has to be set. Maybe using make-local-variable?
      ([Scroll_Lock] scroll-lock-mode) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
      ([S-f11] check-parens-and-report)
