@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.5.4
-;; Package-Requires: ((usablizer "0.5.0"))
+;; Version: 0.5.5
+;; Package-Requires: ((usablizer "0.5.2"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -1150,7 +1150,7 @@ See also `sr-dired-do-copy-not-annoying'."
      ([M-S-home] zoom-out)
      ([M-S-next] zoom-standard)
      ([M-S-end] zoom-in)
-     ([f22] er/expand-region)
+     ([f18] er/expand-region)
      ([M-S-XF86Open] wg-switch-to-previous-workgroup)
      (,(kbd "M-U") wg-switch-to-previous-workgroup)
      ([s-S-delete] copy-last-message)
