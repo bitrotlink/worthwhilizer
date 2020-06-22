@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.5.5
-;; Package-Requires: ((usablizer "0.5.2"))
+;; Version: 0.5.8
+;; Package-Requires: ((usablizer "0.5.3"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -340,12 +340,14 @@ Relies on `ivy--minibuffer-setup--advice'."
   (mv-to-head 'latin nicizer-kbd-layouts)
   (message "Layout reset"))
 
-(defun nicizer-kbd-previous-layout ()
-  "Switch to previous layout in `nicizer-kbd-layouts'."
-  (interactive)
-  (unless (cadr nicizer-kbd-layouts)
-    (user-error "No other keyboard layout available"))
-  (nicizer-kbd-switch-layout (cadr nicizer-kbd-layouts)))
+(defun nicizer-kbd-previous-layout (&optional arg)
+  "Switch to previous layout in `nicizer-kbd-layouts'. With prefix arg, call `nicizer-kbd-switch-layout' interactively."
+  (interactive "P")
+  (if arg
+      (call-interactively #'nicizer-kbd-switch-layout)
+    (unless (cadr nicizer-kbd-layouts)
+      (user-error "No other keyboard layout available"))
+    (nicizer-kbd-switch-layout (cadr nicizer-kbd-layouts))))
 
 (defun nicizer-kbd-switch-layout (layout)
   "Switch keyboard layout, and move it to head of `nicizer-kbd-layouts'.
@@ -1134,19 +1136,17 @@ See also `sr-dired-do-copy-not-annoying'."
      (,(kbd "s-[") paredit-wrap-square)
 
      ;; Miscellaneous
-     ([s-menu] text-browse-minor-mode-toggle)
-     ([S-menu] nicizer-kbd-previous-layout)
-     ([s-S-menu] nicizer-kbd-switch-layout)
      ([S-f10] nicizer-kbd-layout-reset)
      ([s-XF86Save] UNUSED) ; TODO: display versions of current file
      ([s-S-XF86Save] UNUSED) ; TODO: display versions of file at point
      ([s-S-XF86Save] enable-read-write)
-     ([s-XF86Back] UNUSED)
+     ([s-XF86Back] text-browse-minor-mode-toggle)
      ([s-S-XF86Back] UNUSED)
      ([S-XF86Forward] monospace-mode)
      ([s-XF86Forward] UNUSED)
      ([s-S-XF86Forward] UNUSED)
-     ([s-S-F22] UNUSED)
+     ([f22] nicizer-kbd-previous-layout)
+     ([S-f22] UNUSED)
      ([M-S-home] zoom-out)
      ([M-S-next] zoom-standard)
      ([M-S-end] zoom-in)
@@ -1170,7 +1170,7 @@ See also `sr-dired-do-copy-not-annoying'."
      ([f9] nicizer-reset-stopwatch)
      ([S-XF86Open] counsel-find-file)
      ([SunProps] counsel-M-x)
-     ([s-help] counsel-unicode-char)
+     ([s-f22] counsel-unicode-char)
      (,(kbd "C-c C-r") ivy-resume)
 
      ;; Replace Vimizer and Usablizer bindings to reduce message noise

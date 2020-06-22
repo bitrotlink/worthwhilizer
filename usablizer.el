@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.5.2
+;; Version: 0.5.3
 ;; Package-Requires: ((emacs "25.1") (undo-tree "0.6.6") (vimizer "0.5.0"))
 ;; Keywords: convenience
 
@@ -1245,9 +1245,10 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
 
      ;; Miscellaneous
      ([S-help] eldoc-mode)
-     ([s-help] insert-char)
-     ([s-S-help] describe-char)
-     ([s-S-f22] count-words)
+     ([s-help] UNUSED)
+     ([s-S-help] UNUSED)
+     ([s-f22] insert-char)
+     ([s-S-f22] describe-char)
      ([s-S-right] set-line-wrap)
      ([C-end] UNUSED)
      ([f14] universal-argument)
@@ -1259,6 +1260,8 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([f3] universal-argument-3)
      ([S-f3] universal-argument-3)
      ([menu] menu-bar-open)
+     ([S-menu] count-words)
+     ([s-S-menu] UNUSED)
      ([SunProps] execute-extended-command)
      ([S-SunProps] eval-region-or-last-sexp)
      ([s-SunProps] eval-expression)
