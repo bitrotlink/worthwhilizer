@@ -519,15 +519,20 @@ See the Commentary section of vimizer.el for how these work."
      ([XF86Copy] modal-copy)
      ([S-XF86Cut] cutline)
      ([S-XF86Copy] copyline)
-     ([s-XF86Cut] modal-cut-append)
-     ([s-XF86Copy] modal-copy-append)
-     ([s-S-XF86Cut] cutline-append)
-     ([s-S-XF86Copy] copyline-append)
+     ([M-XF86Cut] modal-cut-append)
+     ([M-XF86Copy] modal-copy-append)
+     ([M-S-XF86Cut] cutline-append)
+     ([M-S-XF86Copy] copyline-append)
+     ([s-XF86Cut] UNUSED)
+     ([s-XF86Copy] VM_COPY_UNBOUND) ; Bound outside Emacs
+     ([s-S-XF86Cut] UNUSED)
+     ([s-S-XF86Copy] UNUSED)
      ([XF86Paste] not-weird-paste)
      ([S-XF86Paste] paste-over)
-     ([s-XF86Paste] paste-rotate-reverse)
-     ([s-S-XF86Paste] paste-rotate)
-     ([M-XF86Paste] paste-primary)
+     ([M-XF86Paste] paste-rotate-reverse)
+     ([M-S-XF86Paste] paste-rotate)
+     ([s-XF86Paste] VM_PASTE_UNBOUND) ; Bound outside Emacs
+     ([s-S-XF86Paste] paste-primary)
 
      ;; Text-selection commands
      ([SunFront] push-mark-command) ; X calls my setmark key ⌜SunFront⌝
