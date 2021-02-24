@@ -1,5 +1,5 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.5.8
+;; Version: 0.5.9
 ;; Package-Requires: ((usablizer "0.5.3"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
@@ -1145,8 +1145,8 @@ See also `sr-dired-do-copy-not-annoying'."
      ([S-XF86Forward] monospace-mode)
      ([s-XF86Forward] UNUSED)
      ([s-S-XF86Forward] UNUSED)
-     ([f22] nicizer-kbd-previous-layout)
-     ([S-f22] UNUSED)
+     ([XF86Keyboard] nicizer-kbd-previous-layout)
+     ([S-XF86Keyboard] UNUSED)
      ([M-S-home] zoom-out)
      ([M-S-next] zoom-standard)
      ([M-S-end] zoom-in)
@@ -1170,7 +1170,7 @@ See also `sr-dired-do-copy-not-annoying'."
      ([f9] nicizer-reset-stopwatch)
      ([S-XF86Open] counsel-find-file)
      ([SunProps] counsel-M-x)
-     ([s-f22] counsel-unicode-char)
+     ([s-XF86Keyboard] counsel-unicode-char)
      (,(kbd "C-c C-r") ivy-resume)
 
      ;; Replace Vimizer and Usablizer bindings to reduce message noise

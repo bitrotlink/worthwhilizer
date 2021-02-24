@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.5.3
+;; Version: 0.5.4
 ;; Package-Requires: ((emacs "25.1") (undo-tree "0.6.6") (vimizer "0.5.0"))
 ;; Keywords: convenience
 
@@ -1161,21 +1161,21 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-down] next-logical-line)
      ([S-prior] scroll-down-line)
      ([S-next] scroll-up-line)
-     ([f21] forward-to-word)
+     ([f20] forward-to-word)
      ([f17] reverse-rotate-mark-ring-and-point)
      ([S-f17] rotate-mark-ring-and-point)
      ([C-S-left] uf-backward-sexp) ; Using C-left and C-right for bw_word and end_wrd keys, so I get S-bw_word and S-end_wrd for uf-backward-sexp and uf-forward-sexp
      ([C-S-right] uf-forward-sexp)
-     ([S-f21] forward-to-sexp)
+     ([S-f20] forward-to-sexp)
      ([C-s-S-left] not-weird-beginning-of-defun)
      ([C-s-S-right] not-weird-end-of-defun)
-     ([s-S-f21] forward-to-defun)
+     ([s-S-f20] forward-to-defun)
      ([s-up] not-weird-backward-paragraph)
      ([s-S-down] not-weird-forward-paragraph)
      ([s-down] forward-to-paragraph)
      ([C-s-left] backward-out-list)
      ([C-s-right] out-list)
-     ([s-f21] in-list)
+     ([s-f20] in-list)
      ([S-home] home-list)
      ([S-end] end-list)
      ([s-S-home] beginning-of-visual-line)
@@ -1197,10 +1197,10 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([s-delete] remove-all-text-properties)
      ("\t" completion-at-point) ; TODO: this gets rid of completion window if I use motion command, but not if I press escape. Get rid of it in latter case also. Other options would be hippie-expand or dabbrev-expand, but they don't use a full-window completion buffer like minibuffer-complete does.
      ([kp-tab] insert-tab-command)
-     ([f23] indent-for-tab-command)
-     ([S-f23] unindent)
-     ([s-f23] indent-sexp-or-region)
-     ([s-S-f23] indent-defun-or-region)
+     ([f21] indent-for-tab-command)
+     ([S-f21] unindent)
+     ([s-f21] indent-sexp-or-region)
+     ([s-S-f21] indent-defun-or-region)
      ([S-return] electric-indent-just-newline)
      ([s-return] nl-under)
      ([s-S-return] nl-over)
@@ -1239,7 +1239,7 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([M-next] delete-other-windows-vertically)
      ([C-M-left] split-window-horizontally)
      ([C-M-right] delete-other-windows-horizontally) ; TODO: implement this
-     ([M-f21] delete-other-windows) ; xmonad uses M-space, not M-f21
+     ([M-f20] delete-other-windows) ; xmonad uses M-space, not M-f20
      ([M-undo] winner-undo) ; TODO: replace by better variant in workgroups2
      ([M-S-undo] winner-redo)
 
@@ -1247,8 +1247,8 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-help] eldoc-mode)
      ([s-help] UNUSED)
      ([s-S-help] UNUSED)
-     ([s-f22] insert-char)
-     ([s-S-f22] describe-char)
+     ([s-XF86Keyboard] insert-char)
+     ([s-S-XF86Keyboard] describe-char)
      ([s-S-right] set-line-wrap)
      ([C-end] UNUSED)
      ([f14] universal-argument)
@@ -1267,8 +1267,8 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([s-SunProps] eval-expression)
      ([s-S-SunProps] shell)
      ;; http://www.freebsddiary.org/APC/usb_hid_usages.php calls code 0x79 "Again". Emacs binds it by default to repeat-complex-command, to which it also binds another key it calls "again". So why does it call 0x79 "redo"? XXX: check bindings.
-     ([s-redo] kmacro-start-macro-or-insert-counter)
-     ([S-redo] kmacro-end-or-call-macro)
+     ([redo] kmacro-end-or-call-macro)
+     ([S-redo] kmacro-start-macro-or-insert-counter)
      ;; Disable undo key if undo-tree mode is disabled, to avoid accidentally using Emacs's standard undo without realizing it
      ([undo] undo-tree-mode-not-enabled)
      ([S-undo] undo-tree-mode-not-enabled)
@@ -1278,9 +1278,9 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-f16] toggle-region-activation)
      ([s-f16] narrow-to-region-tweaked)
      ([s-S-f16] widen)
-     ([f20] jump-to-register)
-     ([S-f20] point-to-register)
-     ([s-f20] list-registers)
+     ([XF86Goto] jump-to-register)
+     ([S-XF86Goto] point-to-register)
+     ([s-XF86Goto] list-registers)
      ;; TODO change scrolling for undo-tree visualizer to use scroll-lock-mode, or at least stop scrolling conservatively. Just setting scroll-conservatively with let binding doesn't work; global value has to be set. Maybe using make-local-variable?
      ([Scroll_Lock] scroll-lock-mode) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
      ([S-f11] check-parens-and-report)
