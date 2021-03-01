@@ -1,5 +1,5 @@
 ;;; usablizer.el --- Make Emacs usable -*- lexical-binding: t; -*-
-;; Version: 0.5.4
+;; Version: 0.6.1
 ;; Package-Requires: ((emacs "25.1") (undo-tree "0.6.6") (vimizer "0.5.0"))
 ;; Keywords: convenience
 
@@ -1208,10 +1208,10 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([s-S-kp-enter] nl-over)
      ;; ([kp-enter] UNUSED) ; TODO: implement fnenter with something like ffap, to follow intra- or inter-document links in text
      ;; ([S-kp-enter] UNUSED) ; TODO: implement something else useful
-     ([cancel] toggle-letter-case) ; [cancel] (used only because I ran out of scancodes) is «case»
-     ([S-cancel] ispell-word)
-     ([s-cancel] ispell)
-     ([s-S-cancel] flyspell-mode-toggle)
+     ([XF86Spell] ispell-word)
+     ([S-XF86Spell] toggle-letter-case)
+     ([s-XF86Spell] ispell)
+     ([s-S-XF86Spell] flyspell-mode-toggle)
 
      ;; File, buffer, and window management
      ([XF86Open] switch-to-buffer)
@@ -1247,8 +1247,8 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-help] eldoc-mode)
      ([s-help] UNUSED)
      ([s-S-help] UNUSED)
-     ([s-XF86Keyboard] insert-char)
-     ([s-S-XF86Keyboard] describe-char)
+     ([s-XF86Xfer] insert-char)
+     ([s-S-XF86Xfer] describe-char)
      ([s-S-right] set-line-wrap)
      ([C-end] UNUSED)
      ([f14] universal-argument)
@@ -1267,8 +1267,8 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([s-SunProps] eval-expression)
      ([s-S-SunProps] shell)
      ;; http://www.freebsddiary.org/APC/usb_hid_usages.php calls code 0x79 "Again". Emacs binds it by default to repeat-complex-command, to which it also binds another key it calls "again". So why does it call 0x79 "redo"? XXX: check bindings.
-     ([redo] kmacro-end-or-call-macro)
-     ([S-redo] kmacro-start-macro-or-insert-counter)
+     ([S-redo] kmacro-end-or-call-macro)
+     ([S-XF86Tools] kmacro-start-macro-or-insert-counter) ; I.e. s-S-redo
      ;; Disable undo key if undo-tree mode is disabled, to avoid accidentally using Emacs's standard undo without realizing it
      ([undo] undo-tree-mode-not-enabled)
      ([S-undo] undo-tree-mode-not-enabled)
@@ -1278,9 +1278,9 @@ If called interactively, or SELECT is non-nil, then switch to the buffer."
      ([S-f16] toggle-region-activation)
      ([s-f16] narrow-to-region-tweaked)
      ([s-S-f16] widen)
-     ([XF86Goto] jump-to-register)
-     ([S-XF86Goto] point-to-register)
-     ([s-XF86Goto] list-registers)
+     ([XF86Go] jump-to-register)
+     ([S-XF86Go] point-to-register)
+     ([s-XF86Go] list-registers)
      ;; TODO change scrolling for undo-tree visualizer to use scroll-lock-mode, or at least stop scrolling conservatively. Just setting scroll-conservatively with let binding doesn't work; global value has to be set. Maybe using make-local-variable?
      ([Scroll_Lock] scroll-lock-mode) ; FIXME (Emacs bug): scroll-lock-mode doesn't work right on wrapped lines; point gets dragged. And scroll-lock-mode doesn't work in undo-tree visualizer.
      ([S-f11] check-parens-and-report)

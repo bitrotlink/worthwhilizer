@@ -1,6 +1,6 @@
 ;;; nicizer.el --- Make Emacs nice -*- lexical-binding: t; -*-
-;; Version: 0.5.9
-;; Package-Requires: ((usablizer "0.5.3"))
+;; Version: 0.6.0
+;; Package-Requires: ((usablizer "0.6.0"))
 
 ;; This file doesn't use hard word wrap. To fold away the long comments and docstrings, use:
 ;; (setq truncate-lines t)
@@ -1145,11 +1145,11 @@ See also `sr-dired-do-copy-not-annoying'."
      ([S-XF86Forward] monospace-mode)
      ([s-XF86Forward] UNUSED)
      ([s-S-XF86Forward] UNUSED)
-     ([XF86Keyboard] nicizer-kbd-previous-layout)
-     ([S-XF86Keyboard] UNUSED)
-     ([M-S-home] zoom-out)
-     ([M-S-next] zoom-standard)
-     ([M-S-end] zoom-in)
+     ([XF86Xfer] nicizer-kbd-previous-layout)
+     ([S-XF86Xfer] UNUSED)
+     ([XF86ZoomOut] zoom-out)
+     ([XF86View] zoom-standard)
+     ([XF86ZoomIn] zoom-in)
      ([f18] er/expand-region)
      ([M-S-XF86Open] wg-switch-to-previous-workgroup)
      (,(kbd "M-U") wg-switch-to-previous-workgroup)
@@ -1170,7 +1170,7 @@ See also `sr-dired-do-copy-not-annoying'."
      ([f9] nicizer-reset-stopwatch)
      ([S-XF86Open] counsel-find-file)
      ([SunProps] counsel-M-x)
-     ([s-XF86Keyboard] counsel-unicode-char)
+     ([s-XF86Xfer] counsel-unicode-char)
      (,(kbd "C-c C-r") ivy-resume)
 
      ;; Replace Vimizer and Usablizer bindings to reduce message noise
