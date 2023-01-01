@@ -22,7 +22,7 @@ Vimizer and Usablizer are complete. I'm dogfooding Nicizer, but it's still a wor
 * Vimizer
 
 ** Vim-style cut and copy transient modes
-Press /Cut/ or /Copy/ to enter /cut/ or /copy/ transient mode (if the region isn't active); then the next command, if it's a motion command, will result in the text moved over by that command being cut or copied. You can provide a prefix arg before or after entering the transient mode, which will cut or copy the text moved over by repeating the motion command the specified number of times, like in Vim.
+Press /Cut/ or /Copy/ to enter /cut/ or /copy/ transient mode (if the region isn't active); then the next command, if it's a motion command, will result in the text that's transited by that command being cut or copied. You can provide a prefix arg before or after entering the transient mode, which will cut or copy the text that's transited by repeating the motion command the specified number of times, like in Vim.
 
 The transient mode is always automatically turned off after the next command (regardless of whether that command is a motion command), which is why the mode called a “transient” mode. Thus, if you press /Cut C-f C-f/, then only one character will be cut, and the next character will just be moved over as usual.
 
@@ -63,24 +63,24 @@ Usablizer fixes that with the command /reverse-rotate-mark-ring-and-point/, whic
 
 Here's how it works. Emacs has a point, a mark, and a separate mark ring (list with a head and tail).
 
-/push-mark/ does this:
+Emacs standard /push-mark/ does this:
 - new head ← mark
 - mark ← point
 - if length of list > max, then chop off tail
 
-/pop-to-mark-command/ does this:
+Emacs standard /pop-to-mark-command/ does this:
 - point ← mark; loses point
 - new tail ← mark
 - mark ← head
 - chop off head
 
-/reverse-rotate-mark-ring-and-point/ does this instead:
+Usablizer's /reverse-rotate-mark-ring-and-point/ does this instead:
 - new tail ← point
 - point ← mark; doesn't lose point, since it was saved in the previous step
 - mark ← head
 - chop off head
 
-/rotate-mark-ring-and-point/ does this, so you don't have to cycle through the whole ring to get back where you were:
+Usablizer's /rotate-mark-ring-and-point/ does this, so you don't have to cycle through the whole ring to get back where you were:
 - new head ← mark
 - mark ← point
 - point ← tail
