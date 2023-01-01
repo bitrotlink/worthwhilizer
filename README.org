@@ -1,0 +1,136 @@
+#+TITLE: Worthwhilizer
+/A trio of packages to make Emacs worthwhile/
+
+* Introduction
+
+*Vimizer* is a package for Emacs that provides a few of the most convenient features of Vim: motion-composed /cut/ and /copy/ transient modes, line-based cutting and copying, and line-based text selection.
+
+*Usablizer* is a package of basic tools to make Emacs usable: fixes for Emacs's movement commands and mark ring navigation commands, a closed-buffer tracker, a less-accident-prone interactive evaluation command, and a variety of other convenience commands. It also optionally provides optimal keybindings for all those, in case you have a decent keyboard, which you don't.
+
+Unlike other vimization packages for Emacs (and Vim itself), Vimizer and Usablizer don't separate insertion and command modes, because such separation results in accidentally inserting the hotkey-names of commands into buffers when you try to execute the commands, and accidentally mangling buffers with random edits when you try to insert text, even after you have years of experience with Vim as your primary editor. Instead, Vimizer and Usablizer provide modeless bindings for function keys, so the commands are always available but never interfere with text insertion.
+
+*Nicizer* is a package of additional tools and some default settings to make Emacs nice.
+
+Nicizer depends on Usablizer, which in turn depends on Vimizer.
+
+
+* Status
+
+Vimizer and Usablizer are complete. I'm dogfooding Nicizer, but it's still a work in progress.
+
+
+* Vimizer
+
+** Vim-style cut and copy transient modes
+Press /Cut/ or /Copy/ to enter /cut/ or /copy/ transient mode (if the region isn't active); then the next command, if it's a motion command, will result in the text moved over by that command being cut or copied. You can provide a prefix arg before or after entering the transient mode, which will cut or copy the text moved over by repeating the motion command the specified number of times, like in Vim.
+
+The transient mode is always automatically turned off after the next command (regardless of whether that command is a motion command), which is why the mode called a “transient” mode. Thus, if you press /Cut C-f C-f/, then only one character will be cut, and the next character will just be moved over as usual.
+
+If the region is active, then /Cut/ or /Copy/ will simply /cut/ or /copy/ the region instead of entering the transient mode.
+
+** Vim-style line-based cutting, copying, pasting, and selection, and repeatable pasting
+Press these keys for these features:
+- /S-Cut/ or /S-Copy/ :: cut or copy the current logical line, regardless of where the cursor is on the line. Use a prefix arg to cut or copy the specified number of logical lines, starting with the current one. If the region is active, then cut or copy all logical lines that have at least one character in the region.
+- /Paste/ :: paste text from the head of the clip ring. Use a prefix arg to paste the specified number of copies of that text.
+- /S-Paste/ :: paste text from the head of the clip ring to a new line over the current logical line, regardless of where the cursor currently is on the line, and regardless of whether the pasted text was originally cut or copied as a full line. Because of this, if you press /S-Cut/ followed by /S-Paste/, the text is cut and then pasted back in the same place, effectively undoing the cut. If you press /S-Copy/ followed by /S-Paste/, the current logical line is duplicated.
+- /S-SunFront/ :: enter /line-select/ mode. In this mode, complete logical lines are selected and highlighted, regardless of which commands you use to move the cursor. You can then cut or copy the selected text or do anything else that uses an active region. To cancel the mode, press whatever key or chord you have bound to keyboard-quit (/C-g/ by default in Emacs).
+- /s-Cut/, /s-Copy/, /s-S-Cut/, or /s-S-Copy/ :: do the same as without suplm, but append the cut or copied text to the end of the text at the head of the clip ring rather than pushing the cut or copied text to a new element on the clip ring.
+- /s-Paste/ :: reverse rotate through the clip ring and replace the last pasted text (this is Emacs's standard yank-pop). Press /s-S-Paste/ to forward rotate. Press /M-Paste/ to paste the primary selection (OS-dependent).
+- /SunFront/ :: enter standard text-select mode (this is Emacs's standard push-mark-command).
+- /s-SunFront/ :: enter rectangle-select mode (Emacs's standard rectangle-mark-mode).
+
+If you don't have /Cut/, /Copy/, /Paste/, and /SunFront/ keys, or if they're not in convenient locations, then get a better keyboard.
+
+By the time the /Cut/, /Copy/, and /Paste/ keys' names make their way through the input stack to Emacs on X on Linux (other systems not tried), those names are prefixed with /XF86/, so the keybindings in this package use those prefixed names.
+
+
+* Usablizer
+
+All of the following features ought to be in standard Emacs, to make it usable by default. Until then, Usablizer is available as a separate package.
+
+** Fixes for Emacs's weirdly-behaving movement commands
+Emacs has word-based movement commands that work exactly like they're supposed to:
+- /backward-word/ lands on the first preceding start of a word
+- /forward-word/ lands following the next end of a word
+- /forward-to-word/ lands on the next start of a word
+
+However, the corresponding standard s-exp-, defun-, and paragraph-based movement commands land on the wrong position, give inscrutable error messages, interpret their arguments incorrectly, or are just plain missing. Usablizer introduces the three missing combinations, and fixes the six others. See the new commands' docstrings for details.
+
+** A replacement for Emacs's point-losing pop-to-mark-command
+In Emacs, /pop-to-mark-command/ loses the current point. That loss is annoying.
+
+Usablizer fixes that with the command /reverse-rotate-mark-ring-and-point/, which replaces /pop-to-mark-command/.
+
+Here's how it works. Emacs has a point, a mark, and a separate mark ring (list with a head and tail).
+
+/push-mark/ does this:
+- new head ← mark
+- mark ← point
+- if length of list > max, then chop off tail
+
+/pop-to-mark-command/ does this:
+- point ← mark; loses point
+- new tail ← mark
+- mark ← head
+- chop off head
+
+/reverse-rotate-mark-ring-and-point/ does this instead:
+- new tail ← point
+- point ← mark; doesn't lose point, since it was saved in the previous step
+- mark ← head
+- chop off head
+
+/rotate-mark-ring-and-point/ does this, so you don't have to cycle through the whole ring to get back where you were:
+- new head ← mark
+- mark ← point
+- point ← tail
+- chop off tail
+
+** Less-accident-prone interactive evaluation
+Suppose you accidentally use /eval-last-sexp/ instead of /eval-region/ after setting the region around a block of code, so you think you evaluated it all but actually didn't. Or you type just one expression and intend to evaluate it, but accidentally use /eval-region/ (to which you have a key bound because you use it often), which evaluates a bunch of stuff you didn't want.
+
+/eval-region-or-last-sexp/ solves those problems. It simply evals the region if it's active, and evals the last sexp otherwise. If you use transient mark mode, it's unlikely that you want /eval-region/ when you don't have an active region, and it's unlikely that you want /eval-last-sexp/ when you do have an active region, so combining the two into one command reduces mistakes.
+
+** Miscellaneous convenience commands
+- Vim's «o» and «O». 'nuff said.
+- /rename-file-and-buffer/, with accident avoidance.
+- /set-line-wrap/, a replacement for Emacs's /toggle-word-wrap/, whose name is a lie (though at least the lie is documented) if /truncate-lines/ or /truncate-partial-width-windows/ is non-nil.
+- Many others.
+
+** Keybindings (not enabled by default)
+- Optimal keybindings for all the features above. You'll hate these, because your keyboard sucks.
+- Shift-chorded keys put to good uses, and /shift-select-mode/ therefore disabled, even though it's widely popular, since it's a waste of those prime keychords. The traditional Emacs way (set the mark manually, then use normal motion commands to select text) is the right way, and with a non-chorded key (/SunFront/ by default, in Vimizer's case) bound to /push-mark-command/, takes no extra keystrokes.
+- All normal modern software uses the /escape/ key to escape the current context (i.e. cancel), but Emacs by default uses it as a sticky modifier key for chorded hotkeys. Usablizer provides the correct binding for /escape/.
+
+To enable all the keybindings, use:
+~(usablizer-bind-keys)~
+
+** Register maintenance
+Emacs lets your registers become stale. Usablizer provides /register-swap-back/, which solves this problem.
+
+** A closed-buffer tracker
+Tracks your history of closed buffers and enables reopening them. Restores major mode, minor modes, point, mark, mark ring, and other buffer-local variables. Currently only implemented for file-visiting buffers. This feature only works in Emacs 25 and later.
+
+
+* Nicizer
+Nicizer improves a few display, search, and editing settings and features in Emacs. It provides:
+
+** An uncluttered modeline
+Minor modes that are normally on (with Nicizer, these include /undo-tree-mode/, /ivy-mode/, /whitespace-mode/, and /word-wrap/ in /text-mode/ and /prog-mode/ buffers) have their lighters hidden in the modeline when the modes are on, and have mode-off lighters shown when the modes are off. The latter feature compensates for the former, ensuring that the modeline is never ambiguous about which modes are on.
+
+** Simpler access to the /isearch/ history ring
+Instead of having to press /s-p/ and /s-n/ to cycle through the history ring, you can just press the up and down arrow keys, like Emacs already lets you do for cycling through various history rings in the minibuffer. Nicizer's special implementation of this feature is necessary because of Emacs's weird /isearch/ implementation, which doesn't start by using the minibuffer even though it looks like it does.
+After you actually do a search in /isearch/ mode (regardless of whether you accessed the history ring), the up/down arrow key access to the history ring is automatically disabled, so you can then press up or down (or any other key for a motion command) to exit /isearch/ mode, as usual.
+You can still use /s-p/ and /s-n/ to cycle the ring, and Nicizer's simpler access feature doesn't get in your way if you don't want to use it.
+
+** A simple /text-browse/ minor mode
+This is like Emacs's /view-mode/, except not annoying.
+
+** Variable-pitch enabled by default, and a monospace mode
+Since Emacs is a text editor, and text is usually more readable with variable-pitch fonts, Nicizer enables variable-pitch by default. Monospace mode is provided to compensate, and is enabled by default for major modes that need it.
+
+** Word-wrap enabled by default
+Sometimes you want char wrap or no wrap, but Emacs is a text editor; word wrap is the common case. For the uncommon cases, use /set-line-wrap/ (from Usablizer).
+
+** Various Emacs settings and features enabled to make it nicer
+/undo-tree-mode/, /electric-pair-mode/, /show-paren-mode/, /size-indication-mode/, better settings for scrolling, etc.

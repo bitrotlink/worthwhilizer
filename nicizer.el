@@ -9,30 +9,7 @@
 ;; To show the long lines, use:
 ;; (set-line-wrap 'word) ; or press s-S-right
 
-
-;;; Commentary:
-;;
-;; Nicizer improves a few display, search, and editing settings and features in Emacs. It provides:
-;;
-;; 0. An uncluttered modeline.
-;; Minor modes that are normally on (with Nicizer, these include undo-tree-mode, ivy-mode, whitespace-mode, and word-wrap in text-mode and prog-mode buffers) have their lighters hidden in the modeline when the modes are on, and have mode-off lighters shown when the modes are off. The latter feature compensates for the former, ensuring that the modeline is never ambiguous about which modes are on.
-;;
-;; 1. Simpler access to the isearch history ring.
-;; Instead of having to press s-p and s-n to cycle through the history ring, you can just press the up and down arrow keys, like Emacs already lets you do for cycling through various history rings in the minibuffer. Nicizer's special implementation of this feature is necessary because of Emacs's weird isearch implementation, which doesn't start by using the minibuffer even though it looks like it does.
-;; After you actually do a search in isearch mode (regardless of whether you accessed the history ring), the up/down arrow key access to the history ring is automatically disabled, so you can then press up or down (or any other key for a motion command) to exit isearch mode, as usual.
-;; You can still use s-p and s-n to cycle the ring, and Nicizer's simpler access feature doesn't get in your way if you don't want to use it.
-;;
-;; 2. A simple text-browse minor mode.
-;; This is like Emacs's view-mode, except not annoying.
-;;
-;; 3. Variable-pitch enabled by default, and a monospace mode.
-;; Since Emacs is a text editor, and text is usually more readable with variable-pitch fonts, Nicizer enables variable-pitch by default. Monospace mode is provided to compensate, and is enabled by default for major modes that need it.
-;;
-;; 4. Word-wrap enabled by default.
-;; Sometimes you want char wrap or no wrap, but Emacs is a text editor; word wrap is the common case. For the uncommon cases, use set-line-wrap (from Usablizer).
-;;
-;; 5. Various Emacs settings and features enabled to make it nicer.
-;; undo-tree-mode, electric-pair-mode, show-paren-mode, size-indication-mode, better settings for scrolling, etc.
+;; For documentation, see README.org in the «worthwhilizer» Git repository
 
 
 ;;; Code:

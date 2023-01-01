@@ -10,71 +10,7 @@
 ;; To show the long lines, use:
 ;; (set-line-wrap 'word) ; or press s-S-right
 
-
-;;; Commentary:
-;;
-;; Features:
-;;
-;; All of the following features ought to be in standard Emacs, to make it usable by default. Until then, Usablizer is available as a separate package.
-;;
-;; 0. Fixes for Emacs's weirdly-behaving movement commands.
-;; Emacs has word-based movement commands that work exactly like they're supposed to:
-;; backward-word lands on the first preceding start of a word
-;; forward-word lands following the next end of a word
-;; forward-to-word lands on the next start of a word
-;; However, the corresponding standard s-exp-, defun-, and paragraph-based movement commands land on the wrong position, give inscrutable error messages, interpret their arguments incorrectly, or are just plain missing. Usablizer introduces the three missing combinations, and fixes the six others. See the new commands' docstrings for details.
-;;
-;; 1. A replacement for Emacs's point-losing pop-to-mark-command.
-;; In Emacs, pop-to-mark-command loses the current point. That loss is annoying.
-;; Usablizer fixes that with the command reverse-rotate-mark-ring-and-point, which replaces pop-to-mark-command.
-;;
-;; Here's how it works. Emacs has a point, a mark, and a separate mark ring (list with a head and tail).
-;; push-mark does this:
-;; new head ← mark
-;; mark ← point
-;; if length of list > max, then chop off tail
-;;
-;; pop-to-mark-command does this:
-;; point ← mark; loses point
-;; new tail ← mark
-;; mark ← head
-;; chop off head
-;;
-;; reverse-rotate-mark-ring-and-point does this instead:
-;; new tail ← point
-;; point ← mark; doesn't lose point, since it was saved in the previous step
-;; mark ← head
-;; chop off head
-;;
-;; rotate-mark-ring-and-point does this, so you don't have to cycle through the whole ring to get back where you were:
-;; new head ← mark
-;; mark ← point
-;; point ← tail
-;; chop off tail
-;;
-;; 2. Less-accident-prone interactive evaluation.
-;; Suppose you accidentally use eval-last-sexp instead of eval-region after setting the region around a block of code, so you think you evaluated it all but actually didn't. Or you type just one expression and intend to evaluate it, but accidentally use eval-region (to which you have a key bound because you use it often), which evaluates a bunch of stuff you didn't want.
-;;
-;; eval-region-or-last-sexp solves those problems. It simply evals the region if it's active, and evals the last sexp otherwise. If you use transient mark mode, it's unlikely that you want eval-region when you don't have an active region, and it's unlikely that you want eval-last-sexp when you do have an active region, so combining the two into one command reduces mistakes.
-;;
-;; 3. Miscellaneous convenience commands.
-;; Vim's «o» and «O». 'nuff said.
-;; rename-file-and-buffer, with accident avoidance.
-;; set-line-wrap, a replacement for Emacs's toggle-word-wrap, whose name is a lie (though at least the lie is documented) if truncate-lines or truncate-partial-width-windows is non-nil.
-;; Many others.
-;;
-;; 4. Keybindings (not enabled by default).
-;; Optimal keybindings for all the features above. You'll hate these, because your keyboard sucks.
-;; Shift-chorded keys put to good uses, and shift-select-mode therefore disabled, even though it's widely popular, since it's a waste of those prime keychords. The traditional Emacs way (set the mark manually, then use normal motion commands to select text) is the right way, and with a non-chorded key (SunFront by default, in Vimizer's case) bound to push-mark-command, takes no extra keystrokes.
-;; All normal modern software uses the «escape» key to escape the current context (i.e. cancel), but Emacs by default uses it as a sticky modifier key for chorded hotkeys. Usablizer provides the correct binding for «escape».
-;; To enable all the keybindings, use:
-;; (usablizer-bind-keys)
-;;
-;; 5. Register maintenance.
-;; Emacs lets your registers become stale. Usablizer provides register-swap-back, which solves this problem.
-;;
-;; 6. A closed-buffer tracker.
-;; Tracks your history of closed buffers and enables reopening them. Restores major mode, minor modes, point, mark, mark ring, and other buffer-local variables. Currently only implemented for file-visiting buffers. This feature only works in Emacs 25 and later.
+;; For documentation, see README.org in the «worthwhilizer» Git repository
 
 
 ;;; Code:
